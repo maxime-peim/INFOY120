@@ -8,4 +8,23 @@ if __name__ == "__main__":
     print(TFP)
 
     HUM = E13 + TFP
+    HUM.name = "HUM"
     print(HUM)
+
+    FSF = dataset.Dataset("datasets/fake/FSF")
+    print(FSF)
+
+    INT = dataset.Dataset("datasets/fake/INT")
+    print(INT)
+    
+    TWT = dataset.Dataset("datasets/fake/TWT")
+    print(TWT)
+
+    FAK = FSF + INT + TWT
+    FAK.name = "FAK"
+    print(FAK)
+    
+    UFAK = FAK.undersample(HUM.size)
+    UFAK.name = "UFAK"
+    print(UFAK)
+

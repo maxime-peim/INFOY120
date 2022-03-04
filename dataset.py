@@ -1,7 +1,5 @@
-from ast import In
-from dataclasses import dataclass
-from importlib.resources import path
 import os
+import random
 
 import pandas as pd
 import dataclasses as dc
@@ -26,23 +24,19 @@ class InvalidDatasetFolderError(Exception):
     pass
 
 class Dataset:
+    """
+        Ease manipulation of datasets.
+        Multiple paths to csv can be passed to the constructor to build a dataset.
+        The dataset's label and name depend on subdatasets from each path.
+    """
 
     def __init__(self, *paths_to_csv):
-        self.label = None
         self.name = None
+        self._label = None
         self._paths_to_csv = set(paths_to_csv)
         self._users = set()
         
         self._set_users()
-
-    @classmethod
-    def from_users(cls, users):
-        paths = set(
-            os.path.join("datasets", user.label, user.dataset_name)
-            for user in users
-        )
-
-        return cls(*paths)
 
     @property
     def users(self):
@@ -51,6 +45,10 @@ class Dataset:
     @property
     def paths_to_csv(self):
         return self._paths_to_csv
+
+    @property
+    def size(self):
+        return len(self._users)
 
     @paths_to_csv.setter
     def paths_to_csv(self, *paths):
@@ -64,10 +62,10 @@ class Dataset:
 
             self._users |= users
 
-            if self.label is None:
-                self.label = label
-            elif self.label != label:
-                self.label = "mixed"
+            if self._label is None:
+                self._label = label
+            elif self._label != label:
+                self._label = "mixed"
 
             names.append(name)
         
@@ -107,7 +105,7 @@ class Dataset:
         return set(users), label, name
 
     def copy(self):
-        return Dataset(self.name, self.label, self.paths_to_csv)
+        return Dataset(*self._paths_to_csv)
 
     def __add__(self, other):
         if not isinstance(other, Dataset):
@@ -120,8 +118,18 @@ class Dataset:
 
         return Dataset(*paths_to_csv)
 
-    def undersample(self, num_points):
-        pass
+    def inplace_undersample(self, num_points):
+        self._users = random.sample(self._users, num_points)
+        self._paths_to_csv = set(
+            os.path.join("datasets", user.label, user.dataset_name)
+            for user in self._users
+        )
 
+    def undersample(self, num_points):
+        new_dataset = self.copy()
+        new_dataset.inplace_undersample(num_points)
+        
+        return new_dataset
+    
     def __str__(self):
-        return f"Dataset '{self.name}', labeled {self.label}, with {len(self._users)} users."
+        return f"Dataset '{self.name}', labeled {self._label}, with {len(self._users)} users."
