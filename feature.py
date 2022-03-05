@@ -44,7 +44,7 @@ class FeaturesFile(FeaturesGroup):
     def __init__(self, path):
         super().__init__()
         
-        dataframe = pd.read_csv(path)
+        dataframe = pd.read_csv(path, encoding = "ISO-8859-1")
         self._df_grouped_by_user = self._prepare_data(dataframe)
         
     def _prepare_data(self, dataframe):
@@ -75,6 +75,36 @@ class UsersFeaturesFile(FeaturesFile):
     
     def _prepare_data(self, dataframe):
         return dataframe.fillna('').set_index("id")
+    
+class FriendsFeaturesFile(FeaturesFile):
+    
+    _group_name = "Friends group"
+    
+    def __init__(self, path):
+        super().__init__(os.path.join(path, "friends.csv"))
+    
+    def _prepare_data(self, dataframe):
+        return dataframe.groupby("source_id").agg(list)
+    
+class FollowersFeaturesFile(FeaturesFile):
+    
+    _group_name = "Followers group"
+    
+    def __init__(self, path):
+        super().__init__(os.path.join(path, "followers.csv"))
+    
+    def _prepare_data(self, dataframe):
+        return dataframe.groupby("source_id").agg(list)
+    
+class TweetsFeaturesFile(FeaturesFile):
+    
+    _group_name = "Tweets group"
+    
+    def __init__(self, path):
+        super().__init__(os.path.join(path, "tweets.csv"))
+    
+    def _prepare_data(self, dataframe):
+        return dataframe.fillna('').set_index(["user_id", "id"])
 
 class Feature:
     
@@ -90,7 +120,7 @@ class Feature:
                 features_group.add_feature(self)
             elif isinstance(features_group, type):
                 features_group.add_common_feature(self)
-                
+
     @property
     def features_groups(self):
         return self._features_groups
@@ -106,7 +136,7 @@ class Feature:
             raise NotImplementedError
         
         return self.name == other.name
-    
+
 string_not_empty = lambda x: len(str(x).strip()) > 0
 
 class_A = FeaturesGroup(group_name="Class A")
