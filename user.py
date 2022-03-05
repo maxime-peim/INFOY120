@@ -12,4 +12,5 @@ class User:
     def __eq__(self, other):
         if not isinstance(other, type(self)):
             return NotImplementedError
-        return self.id == other.id
+        return self.id == other.id and self.label == other.label \
+            and self.dataset_name == other.dataset_name
