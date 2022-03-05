@@ -44,8 +44,7 @@ class FeaturesFile(FeaturesGroup):
     def __init__(self, path):
         super().__init__()
         
-        file_path = os.path.join(path, "users.csv")
-        dataframe = pd.read_csv(file_path)
+        dataframe = pd.read_csv(path)
         self._df_grouped_by_user = self._prepare_data(dataframe)
         
     def _prepare_data(self, dataframe):
@@ -70,6 +69,9 @@ class FeaturesFile(FeaturesGroup):
 class UsersFeaturesFile(FeaturesFile):
     
     _group_name = "Users group"
+    
+    def __init__(self, path):
+        super().__init__(os.path.join(path, "users.csv"))
     
     def _prepare_data(self, dataframe):
         return dataframe.fillna('').set_index("id")
