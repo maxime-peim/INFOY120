@@ -3,8 +3,6 @@ import random
 
 import pandas as pd
 import dataclasses as dc
-from enum import Enum, auto
-
 
 @dc.dataclass
 class Users:
@@ -16,8 +14,8 @@ class Users:
         return hash((self.id, self.label, self.dataset_name))
 
     def __eq__(self, other):
-        if not isinstance(other, Users):
-            return NotImplemented
+        if not isinstance(other, type(self)):
+            return NotImplementedError
         return self.id == other.id
 
 class InvalidDatasetFolderError(Exception):
@@ -31,31 +29,66 @@ class Dataset:
     """
 
     def __init__(self, *paths_to_csv):
-        self.name = None
         self._label = None
+        self._names = set()
         self._paths_to_csv = set(paths_to_csv)
         self._users = set()
         
-        self._set_users()
+        self._set_users_from_paths()
+
+    @property
+    def size(self):
+        return len(self._users)
 
     @property
     def users(self):
         return self._users
 
     @property
-    def paths_to_csv(self):
-        return self._paths_to_csv
+    def name(self):
+        return " U ".join(self._names)
+
+    @name.setter
+    def name(self, name):
+        self._names.clear()
+        self._names.add(name)
+
+    @users.setter
+    def users(self, users):
+        self._users = set(users)
+        self._paths_to_csv.clear()
+        self._names.clear()
+
+        self._label = None
+
+        for user in users:
+            self._paths_to_csv.add(
+                os.path.join("datasets", user.label, user.dataset_name))
+            
+            if self._label is None:
+                self._label = user.label
+            elif self._label != user.label:
+                self._label = "mixed"
+            
+            self._names.add(user.dataset_name)
 
     @property
-    def size(self):
-        return len(self._users)
+    def paths_to_csv(self):
+        return self._paths_to_csv
 
     @paths_to_csv.setter
     def paths_to_csv(self, *paths):
         self._paths_to_csv = set(paths)
-        self._set_users()
+        self._set_users_from_paths()
 
-    def _set_users(self):
+    @classmethod
+    def from_users(cls, users):
+        new_dataset = cls()
+        new_dataset.users = users
+
+        return new_dataset
+
+    def _set_users_from_paths(self):
         names = []
         for path in self._paths_to_csv:
             users, label, name = self.extract_users_from_path(path)
@@ -105,18 +138,7 @@ class Dataset:
         return set(users), label, name
 
     def copy(self):
-        return Dataset(*self._paths_to_csv)
-
-    def __add__(self, other):
-        if not isinstance(other, Dataset):
-            raise NotImplemented
-
-        if self.paths_to_csv == other.paths_to_csv:
-            return self.copy()
-        
-        paths_to_csv = self.paths_to_csv.union(other.paths_to_csv)
-
-        return Dataset(*paths_to_csv)
+        return type(self)(*self._paths_to_csv)
 
     def inplace_undersample(self, num_points):
         self._users = random.sample(self._users, num_points)
@@ -130,6 +152,50 @@ class Dataset:
         new_dataset.inplace_undersample(num_points)
         
         return new_dataset
+
+    def __iadd__(self, other):
+        if not isinstance(other, type(self)):
+            raise NotImplementedError
+
+        self.users = self.users.union(other.users)
+
+    def __add__(self, other):
+        if not isinstance(other, type(self)):
+            raise NotImplementedError
+
+        users = self.users.union(other.users)
+
+        return type(self).from_users(users)
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+           raise NotImplementedError
+
+        return self.users == other.users
+
+    def __lt__(self, other):
+        if not isinstance(other, type(self)):
+           raise NotImplementedError
+
+        return self.users.issubset(other.users)
+
+    def __gt__(self, other):
+        if not isinstance(other, type(self)):
+           raise NotImplementedError
+
+        return other.users.issubset(self.users)
+
+    def __le__(self, other):
+        if not isinstance(other, type(self)):
+           raise NotImplementedError
+
+        return self.__eq__(other) or self.__lt__(other)
+
+    def __ge__(self, other):
+        if not isinstance(other, type(self)):
+           raise NotImplementedError
+
+        return self.__eq__(other) or self.__gt__(other)
     
     def __str__(self):
         return f"Dataset '{self.name}', labeled {self._label}, with {len(self._users)} users."
