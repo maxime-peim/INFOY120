@@ -2,23 +2,15 @@ import os
 import random
 
 import pandas as pd
-import dataclasses as dc
 
-@dc.dataclass
-class Users:
-    id: int
-    label: str
-    dataset_name: str
-
-    def __hash__(self):
-        return hash((self.id, self.label, self.dataset_name))
-
-    def __eq__(self, other):
-        if not isinstance(other, type(self)):
-            return NotImplementedError
-        return self.id == other.id
+import utils
+import feature as ft
+from user import User
 
 class InvalidDatasetFolderError(Exception):
+    pass
+
+class UserOutsideDatasetError(Exception):
     pass
 
 class Dataset:
@@ -31,18 +23,36 @@ class Dataset:
     def __init__(self, *paths_to_csv):
         self._label = None
         self._names = set()
-        self._paths_to_csv = set(paths_to_csv)
+        self._full_users = set()
         self._users = set()
+        self._features_files = {}
+        self._undersampled = False
         
-        self._set_users_from_paths()
+        self._set_from_paths(paths_to_csv)
 
     @property
     def size(self):
         return len(self._users)
 
     @property
+    def undersampled(self):
+        return self._undersampled
+
+    @property
     def users(self):
         return self._users
+    
+    @users.setter
+    def users(self, users):
+        if not users.issubset(self._full_users):
+            raise UserOutsideDatasetError
+        
+        if len(users) == self._full_users:
+            self._undersampled = False
+            self._users = self._full_users
+        else:
+            self._undersampled = True
+            self._users = users
 
     @property
     def name(self):
@@ -52,64 +62,50 @@ class Dataset:
     def name(self, name):
         self._names.clear()
         self._names.add(name)
-
-    @users.setter
-    def users(self, users):
-        self._users = set(users)
-        self._paths_to_csv.clear()
-        self._names.clear()
-
-        self._label = None
-
-        for user in users:
-            self._paths_to_csv.add(
-                os.path.join("datasets", user.label, user.dataset_name))
-            
-            if self._label is None:
-                self._label = user.label
-            elif self._label != user.label:
-                self._label = "mixed"
-            
-            self._names.add(user.dataset_name)
-
+        
     @property
     def paths_to_csv(self):
-        return self._paths_to_csv
+        return list(self._features_files.keys())
 
     @paths_to_csv.setter
-    def paths_to_csv(self, *paths):
-        self._paths_to_csv = set(paths)
-        self._set_users_from_paths()
+    def paths_to_csv(self, paths):
+        self._set_from_paths(paths)
+        
+    def reset_full_users(self):
+        self._users = self._full_users
 
-    @classmethod
-    def from_users(cls, users):
-        new_dataset = cls()
-        new_dataset.users = users
-
-        return new_dataset
-
-    def _set_users_from_paths(self):
-        names = []
-        for path in self._paths_to_csv:
+    def _set_from_paths(self, paths):
+        self._full_users.clear()
+        self._features_files.clear()
+        
+        for path in paths:
+            path = os.path.normpath(path)
             users, label, name = self.extract_users_from_path(path)
 
-            self._users |= users
+            self._full_users |= users
 
             if self._label is None:
                 self._label = label
             elif self._label != label:
                 self._label = "mixed"
 
-            names.append(name)
-        
-        self.name = " U ".join(names)
+            self._names.add(name)
+            self._features_files[path] = (
+                ft.UsersFeaturesFile(path),
+                ft.FriendsFeaturesFile(path),
+                ft.FollowersFeaturesFile(path),
+                ft.TweetsFeaturesFile(path)
+            ) if not utils.TESTING else ()
+
+        self._undersampled = False
+        self._users = self._full_users
             
     @staticmethod
     def parse_path(path):
         path = os.path.normpath(path)
         path_parts = path.split(os.sep)
 
-        if len(path_parts) >= 3 and path_parts[-3] == "datasets":
+        if len(path_parts) >= 2:
             return path_parts[-2], path_parts[-1]
 
         raise InvalidDatasetFolderError(f"Path {path} is not a valid path to CSV files.")
@@ -131,41 +127,41 @@ class Dataset:
         users_id = pd.read_csv(users_path, usecols=["id"])
         label, name = Dataset.parse_path(path)
         users = [
-            Users(row.id, label, name)
+            User(row.id, label, name)
             for index, row in users_id.iterrows()
         ]
 
         return set(users), label, name
 
     def copy(self):
-        return type(self)(*self._paths_to_csv)
-
-    def inplace_undersample(self, num_points):
-        self._users = random.sample(self._users, num_points)
-        self._paths_to_csv = set(
-            os.path.join("datasets", user.label, user.dataset_name)
-            for user in self._users
-        )
+        return type(self)(*self.paths_to_csv)
 
     def undersample(self, num_points):
-        new_dataset = self.copy()
-        new_dataset.inplace_undersample(num_points)
-        
-        return new_dataset
+        self._users = random.sample(self._users, num_points)
+        self._undersampled = True
+    
+    def make_classification(self, features_group):
+        pass
 
     def __iadd__(self, other):
         if not isinstance(other, type(self)):
             raise NotImplementedError
 
+        self.paths_to_csv = self.paths_to_csv + other.paths_to_csv
         self.users = self.users.union(other.users)
+        
+        return self
 
     def __add__(self, other):
         if not isinstance(other, type(self)):
             raise NotImplementedError
 
-        users = self.users.union(other.users)
+        paths = self.paths_to_csv + other.paths_to_csv
+        new_dataset = type(self)(*paths)
+        
+        new_dataset.users = self.users.union(other.users)
 
-        return type(self).from_users(users)
+        return new_dataset
 
     def __eq__(self, other):
         if not isinstance(other, type(self)):
