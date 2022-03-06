@@ -44,10 +44,19 @@ class FeaturesFile(FeaturesGroup):
     def __init__(self, path):
         super().__init__()
         
-        dataframe = pd.read_csv(path, encoding = "ISO-8859-1")
-        self._df_grouped_by_user = self._prepare_data(dataframe)
+        self._path = path
+        self._df_grouped_by_user = pd.read_csv(path, encoding = "ISO-8859-1")
+        self._prepare_data()
         
-    def _prepare_data(self, dataframe):
+    @property
+    def user_grouped_df(self):
+        return self._df_grouped_by_user
+
+    @property
+    def path(self):
+        return self._path
+        
+    def _prepare_data(self):
         raise NotImplementedError
     
     def _extract(self, features):
@@ -56,7 +65,7 @@ class FeaturesFile(FeaturesGroup):
             for feature in features
         ]
         
-        extracted_columns = self._df_grouped_by_user[features_columns]
+        extracted_columns = self._df_grouped_by_user[features_columns].copy()
         for feature in features:
             extracted_columns[feature.column_name] = extracted_columns[feature.column_name].apply(feature.transformation)
         
@@ -73,8 +82,10 @@ class UsersFeaturesFile(FeaturesFile):
     def __init__(self, path):
         super().__init__(os.path.join(path, "users.csv"))
     
-    def _prepare_data(self, dataframe):
-        return dataframe.fillna('').set_index("id")
+    def _prepare_data(self):
+        self._df_grouped_by_user.fillna('', inplace=True)
+        self._df_grouped_by_user.rename(columns={"id": "user_id"}, inplace=True)
+        self._df_grouped_by_user.set_index('user_id', inplace=True)
     
 class FriendsFeaturesFile(FeaturesFile):
     
@@ -83,8 +94,9 @@ class FriendsFeaturesFile(FeaturesFile):
     def __init__(self, path):
         super().__init__(os.path.join(path, "friends.csv"))
     
-    def _prepare_data(self, dataframe):
-        return dataframe.groupby("source_id").agg(list)
+    def _prepare_data(self):
+        self._df_grouped_by_user.rename(columns={"source_id": "user_id"}, inplace=True)
+        self._df_grouped_by_user = self._df_grouped_by_user.groupby("user_id").agg(list)
     
 class FollowersFeaturesFile(FeaturesFile):
     
@@ -93,8 +105,9 @@ class FollowersFeaturesFile(FeaturesFile):
     def __init__(self, path):
         super().__init__(os.path.join(path, "followers.csv"))
     
-    def _prepare_data(self, dataframe):
-        return dataframe.groupby("source_id").agg(list)
+    def _prepare_data(self):
+        self._df_grouped_by_user.rename(columns={"source_id": "user_id"}, inplace=True)
+        self._df_grouped_by_user = self._df_grouped_by_user.groupby("user_id").agg(list)
     
 class TweetsFeaturesFile(FeaturesFile):
     
@@ -103,8 +116,9 @@ class TweetsFeaturesFile(FeaturesFile):
     def __init__(self, path):
         super().__init__(os.path.join(path, "tweets.csv"))
     
-    def _prepare_data(self, dataframe):
-        return dataframe.fillna('').set_index(["user_id", "id"])
+    def _prepare_data(self):
+        self._df_grouped_by_user.fillna("", inplace=True)
+        self._df_grouped_by_user.set_index(["user_id", "id"], inplace=True)
 
 class Feature:
     
