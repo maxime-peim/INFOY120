@@ -5,7 +5,6 @@ import pandas as pd
 
 import utils
 import feature as ft
-from user import User
 
 class InvalidDatasetFolderError(Exception):
     pass
@@ -23,8 +22,8 @@ class Dataset:
     def __init__(self, *paths_to_csv):
         self._label = None
         self._names = set()
-        self._full_users = set()
-        self._users = set()
+        self._full_users = None
+        self._users = None
         self._features_files = {}
         self._undersampled = False
         
@@ -32,7 +31,9 @@ class Dataset:
 
     @property
     def size(self):
-        return len(self._users)
+        if self._users is None:
+            return 0
+        return len(self._users.index)
 
     @property
     def undersampled(self):
@@ -40,19 +41,31 @@ class Dataset:
 
     @property
     def users(self):
+        if self._users is None:
+            return pd.DataFrame()
         return self._users
     
     @users.setter
     def users(self, users):
-        if not users.issubset(self._full_users):
+        if not users.index.isin(self._full_users.index).all():
             raise UserOutsideDatasetError
         
-        if len(users) == self._full_users:
+        if len(users.index) == len(self._full_users.index):
             self._undersampled = False
             self._users = self._full_users
         else:
             self._undersampled = True
             self._users = users
+            
+    @property
+    def features_files(self):
+        return self._features_files
+    
+    @features_files.setter
+    def features_files(self, features_files):
+        paths = list(features_files.keys())
+        self._features_files = features_files
+        self._set_from_paths(paths)
 
     @property
     def name(self):
@@ -75,29 +88,42 @@ class Dataset:
         self._users = self._full_users
 
     def _set_from_paths(self, paths):
-        self._full_users.clear()
-        self._features_files.clear()
+        # remove paths that are not needed
+        # and keep ones that will not need reload
+        to_remove_paths = [
+            path
+            for path in self._features_files.keys()
+            if path not in paths
+        ]
+        for path in to_remove_paths:
+            del self._features_files[path]
         
+        users_dfs = []
         for path in paths:
             path = os.path.normpath(path)
-            users, label, name = self.extract_users_from_path(path)
+            users_df, label, name = self.extract_users_from_path(path)
 
-            self._full_users |= users
+            users_dfs.append(users_df)
 
             if self._label is None:
                 self._label = label
             elif self._label != label:
                 self._label = "mixed"
-
+                
             self._names.add(name)
-            self._features_files[path] = (
-                ft.UsersFeaturesFile(path),
-                ft.FriendsFeaturesFile(path),
-                ft.FollowersFeaturesFile(path),
-                ft.TweetsFeaturesFile(path)
-            ) if not utils.TESTING else ()
+            
+            if path not in self._features_files:
+                print(f"Loading files from {path}... ", flush=True, end="")
+                self._features_files[path] = (
+                    ft.UsersFeaturesFile(path),
+                    ft.FriendsFeaturesFile(path),
+                    ft.FollowersFeaturesFile(path),
+                    ft.TweetsFeaturesFile(path)
+                ) if not utils.TESTING else ()
+                print("Done.", flush=True)
 
         self._undersampled = False
+        self._full_users= pd.concat(users_dfs) if len(users_dfs) > 0 else pd.DataFrame()
         self._users = self._full_users
             
     @staticmethod
@@ -124,42 +150,63 @@ class Dataset:
             if not os.path.exists(mandatory_file):
                 raise InvalidDatasetFolderError(f"{mandatory_file} is missing.")
         
-        users_id = pd.read_csv(users_path, usecols=["id"])
         label, name = Dataset.parse_path(path)
-        users = [
-            User(row.id, label, name)
-            for index, row in users_id.iterrows()
-        ]
+        
+        users_df = pd.read_csv(users_path, usecols=["id", "dataset"])
+        users_df["label"] = label
+        users_df.rename(columns={"id": "user_id"}, inplace=True)
+        users_df.set_index("user_id", inplace=True)
 
-        return set(users), label, name
+        return users_df, label, name
 
     def copy(self):
         return type(self)(*self.paths_to_csv)
 
     def undersample(self, num_points):
-        self._users = random.sample(self._users, num_points)
+        self._users = self._full_users.sample(n=num_points)
         self._undersampled = True
     
     def make_classification(self, features_group):
-        pass
+        users_features = []
+        
+        for features_files in self._features_files.values():
+            sub_users_features = []
+            for features_file in features_files:
+                id_intersection = self._users.index.intersection(features_file.user_grouped_df.index)
+                extracted = features_file.extract(features_group)
+                if not extracted.empty:
+                    sub_users_features.append(extracted.loc[id_intersection])
+
+            users_features.append(pd.concat(sub_users_features, axis=1))
+            
+        X = pd.concat(users_features)
+        X = X.reindex(self._users.index)
+        return X.to_numpy(), self._users["label"].to_numpy(copy=True)
 
     def __iadd__(self, other):
         if not isinstance(other, type(self)):
             raise NotImplementedError
+        
+        # save the users if undersampled before modifying
+        undersampled_users = pd.concat((self.users, other.users))
 
+        self._features_files.update(other.features_files)
         self.paths_to_csv = self.paths_to_csv + other.paths_to_csv
-        self.users = self.users.union(other.users)
+        self.users = undersampled_users
         
         return self
 
     def __add__(self, other):
         if not isinstance(other, type(self)):
             raise NotImplementedError
-
-        paths = self.paths_to_csv + other.paths_to_csv
-        new_dataset = type(self)(*paths)
         
-        new_dataset.users = self.users.union(other.users)
+        # save the users if undersampled before modifying
+        undersampled_users = pd.concat((self.users, other.users))
+
+        new_dataset = type(self)()
+        # share the features files so they will not reload (time and memory savings)
+        new_dataset.features_files = {**self.features_files, **other.features_files}
+        new_dataset.users = undersampled_users
 
         return new_dataset
 
@@ -167,19 +214,19 @@ class Dataset:
         if not isinstance(other, type(self)):
            raise NotImplementedError
 
-        return self.users == other.users
+        return self.users.equals(other.users)
 
     def __lt__(self, other):
         if not isinstance(other, type(self)):
            raise NotImplementedError
 
-        return self.users.issubset(other.users)
+        return self.users.index.isin(other.users.index).all()
 
     def __gt__(self, other):
         if not isinstance(other, type(self)):
            raise NotImplementedError
 
-        return other.users.issubset(self.users)
+        return other.users.index.isin(self.users.index).all()
 
     def __le__(self, other):
         if not isinstance(other, type(self)):
@@ -194,4 +241,4 @@ class Dataset:
         return self.__eq__(other) or self.__gt__(other)
     
     def __str__(self):
-        return f"Dataset '{self.name}', labeled {self._label}, with {len(self._users)} users."
+        return f"Dataset '{self.name}', labeled {self._label}, with {self.size} users."
