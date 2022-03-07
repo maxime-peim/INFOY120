@@ -49,8 +49,8 @@ class FeaturesFile(FeaturesGroup):
     _group_name = "Generic file group"
     _loaded = {}
 
-    def __init__(self, path):
-        super().__init__()
+    def __init__(self, path, *features, group_name=None):
+        super().__init__(*features, group_name=group_name)
         
         self._path = os.path.abspath(path)
         if self._path not in self._loaded:
@@ -77,17 +77,13 @@ class FeaturesFile(FeaturesGroup):
         raise NotImplementedError
     
     def _extract(self, features):
-        features_columns = [
-            feature.column_name
-            for feature in features
-        ]
-        
         user_grouped_df = self.user_grouped_df
-        extracted_columns = user_grouped_df[features_columns].copy()
-        for feature in features:
-            extracted_columns[feature.column_name] = extracted_columns[feature.column_name].apply(feature.transformation)
         
-        return extracted_columns
+        features_values = pd.DataFrame()
+        for feature in features:
+            features_values[feature.name] = user_grouped_df[feature.column_names].apply(feature.transformation, axis=1)
+        
+        return features_values
     
     def extract(self, other_group):
         features_to_extract = self.features.intersection(other_group.features)
@@ -97,8 +93,8 @@ class UsersFeaturesFile(FeaturesFile):
     
     _group_name = "Users group"
     
-    def __init__(self, path):
-        super().__init__(os.path.join(path, "users.csv"))
+    def __init__(self, path, *features, group_name=None):
+        super().__init__(os.path.join(path, "users.csv"), *features, group_name=group_name)
     
     def _prepare_data(self):
         user_grouped_df = self.user_grouped_df
@@ -110,8 +106,8 @@ class FriendsFeaturesFile(FeaturesFile):
     
     _group_name = "Friends group"
     
-    def __init__(self, path):
-        super().__init__(os.path.join(path, "friends.csv"))
+    def __init__(self, path, *features, group_name=None):
+        super().__init__(os.path.join(path, "friends.csv"), *features, group_name=group_name)
     
     def _prepare_data(self):
         self.user_grouped_df.rename(columns={"source_id": "user_id"}, inplace=True)
@@ -121,8 +117,8 @@ class FollowersFeaturesFile(FeaturesFile):
     
     _group_name = "Followers group"
     
-    def __init__(self, path):
-        super().__init__(os.path.join(path, "followers.csv"))
+    def __init__(self, path, *features, group_name=None):
+        super().__init__(os.path.join(path, "followers.csv"), *features, group_name=group_name)
     
     def _prepare_data(self):
         self.user_grouped_df.rename(columns={"source_id": "user_id"}, inplace=True)
@@ -132,8 +128,8 @@ class TweetsFeaturesFile(FeaturesFile):
     
     _group_name = "Tweets group"
     
-    def __init__(self, path):
-        super().__init__(os.path.join(path, "tweets.csv"))
+    def __init__(self, path, *features, group_name=None):
+        super().__init__(os.path.join(path, "tweets.csv"), *features, group_name=group_name)
     
     def _prepare_data(self):
         user_grouped_df = self.user_grouped_df
@@ -142,10 +138,10 @@ class TweetsFeaturesFile(FeaturesFile):
 
 class Feature:
     
-    def __init__(self, name, column_name, transformation=None, features_groups=None):
+    def __init__(self, name, column_names, transformation, features_groups=None):
         self.name = name
-        self.column_name = column_name
-        self.transformation = (lambda x: x) if transformation is None else transformation
+        self.column_names = [column_names] if isinstance(column_names, str) else column_names
+        self.transformation = self._transformation_proxy(transformation)
         
         self._features_groups = features_groups
         
@@ -161,6 +157,15 @@ class Feature:
     
     def add_features_group(self, features_group):
         self._features_groups.append(features_group)
+        
+    def _transformation_proxy(self, transformation):
+        def transformation_wrapper(x):
+            args = (
+                x[column_name]
+                for column_name in self.column_names
+            )
+            return transformation(*args)
+        return transformation_wrapper
         
     def __hash__(self):
         return hash(self.name)
@@ -178,6 +183,13 @@ class_B = FeaturesGroup(group_name="Class B")
 class_C = FeaturesGroup(group_name="Class C")
 set_CC = FeaturesGroup(group_name="Set CC")
 
-has_name = Feature("has_name", "name", transformation=string_not_empty, features_groups=[UsersFeaturesFile, class_A, set_CC])
-has_image = Feature("has_image", "default_profile_image", transformation=lambda x: x != 1, features_groups=[UsersFeaturesFile, class_A, set_CC])
-has_address = Feature("has_address", "location", transformation=string_not_empty, features_groups=[UsersFeaturesFile, class_A, set_CC])
+has_name = Feature("has_name", "name", string_not_empty, features_groups=[UsersFeaturesFile, class_A, set_CC])
+has_image = Feature("has_image", "default_profile_image", lambda x: x != 1, features_groups=[UsersFeaturesFile, class_A, set_CC])
+has_address = Feature("has_address", "location", string_not_empty, features_groups=[UsersFeaturesFile, class_A, set_CC])
+has_biography = Feature("has_biography", "description", string_not_empty, features_groups=[UsersFeaturesFile, class_A, set_CC])
+has_at_least_30_followers = Feature("has_at_least_30_followers", "followers_count", lambda x: x >= 30, features_groups=[UsersFeaturesFile, class_A, set_CC])
+has_been_listed = Feature("has_been_listed", "listed_count", lambda x: x > 0, features_groups=[UsersFeaturesFile, class_A, set_CC])
+has_at_least_50_tweets = Feature("has_at_least_50_tweets", "statuses_count", lambda x: x >= 50, features_groups=[UsersFeaturesFile, class_A, set_CC])
+has_enabled_geoloc = Feature("has_enabled_geoloc", "geo_enabled", lambda x: x == 1, features_groups=[UsersFeaturesFile, class_B, set_CC])
+has_url = Feature("has_url", "url", string_not_empty, features_groups=[UsersFeaturesFile, class_A, set_CC])
+has_2followers_greater_than_friends = Feature("has_2followers_greater_than_friends", ["followers_count", "friends_count"], lambda fol, fri: 2*fol >= fri, features_groups=[UsersFeaturesFile, class_A, set_CC])
