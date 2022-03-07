@@ -1,7 +1,7 @@
 from numpy import mean, std
 from sklearn.model_selection import cross_validate
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import precision_score, recall_score, f1_score, make_scorer
+from sklearn.metrics import precision_score, recall_score, f1_score, matthews_corrcoef, make_scorer
 
 import dataset as ds
 import feature as ft
@@ -34,11 +34,15 @@ if __name__ == "__main__":
     # https://machinelearningmastery.com/random-forest-ensemble-in-python/
     RF_model = RandomForestClassifier()
     scoring = {
-        "accuracy": "accuracy",
-        "precision": make_scorer(precision_score, pos_label="human"),
-        "recall": make_scorer(recall_score, pos_label="human"),
-        "f1": make_scorer(f1_score, pos_label="human"),
-        "roc_auc": "roc_auc"
+        "Accuracy": "accuracy",
+        "Precision": make_scorer(precision_score, pos_label="human"),
+        "Recall": make_scorer(recall_score, pos_label="human"),
+        "F-M": make_scorer(f1_score, pos_label="human"),
+        "MCC": make_scorer(matthews_corrcoef),
+        "AUC": "roc_auc"
     }
     scores = cross_validate(RF_model, X, y, scoring=scoring, cv=10, n_jobs=-1, error_score='raise')
-    print(scores)
+    
+    for score_name, values in scores.items():
+        if score_name.startswith("test_"):
+            print(f"{score_name[5:]}: {mean(values):.4f}")
