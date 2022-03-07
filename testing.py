@@ -28,6 +28,10 @@ class TestingDataset(unittest.TestCase):
 
         HUM = E13 + TFP
         self.assertEqual(HUM.size, 1950)
+        
+        HUM2 = E13.copy()
+        HUM2 += TFP
+        self.assertEqual(HUM, HUM2)
 
     def test_subset(self):
         E13 = ds.Dataset("datasets/human/E13")
@@ -49,13 +53,19 @@ class TestingDataset(unittest.TestCase):
         FSF = ds.Dataset("datasets/fake/FSF")
         INT = ds.Dataset("datasets/fake/INT")
         TWT = ds.Dataset("datasets/fake/TWT")
+        E13 = ds.Dataset("datasets/human/E13")
+        TFP = ds.Dataset("datasets/human/TFP")
 
         num_points = 1950
 
         FAK = FSF + INT + TWT
         FAK.undersample(num_points)
-
         self.assertEqual(FAK.size, num_points)
+        
+        HUM = E13 + TFP
+        BAS = FAK + HUM
+        self.assertEqual(BAS.size, num_points + HUM.size)
+        
         
 
 if __name__ == "__main__":

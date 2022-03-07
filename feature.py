@@ -1,6 +1,13 @@
 import os
+import sys
 
+import logging
 import pandas as pd
+from timeit import default_timer as timer
+
+logging.basicConfig(stream=sys.stdout)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 class FeaturesGroup:
     
@@ -40,17 +47,27 @@ class FeaturesGroup:
 class FeaturesFile(FeaturesGroup):
     
     _group_name = "Generic file group"
+    _loaded = {}
 
     def __init__(self, path):
         super().__init__()
         
-        self._path = path
-        self._df_grouped_by_user = pd.read_csv(path, encoding = "ISO-8859-1")
-        self._prepare_data()
+        self._path = os.path.abspath(path)
+        if self._path not in self._loaded:
+            logger.debug(f"Loading file {path} ...")
+            start_loading = timer()
+            
+            self._loaded[self._path] = pd.read_csv(self._path, encoding = "ISO-8859-1")
+            self._prepare_data()
+            
+            end_loading = timer()
+            logger.debug(f"{path} loaded in {end_loading - start_loading:.2f}s")
+        else:
+            logger.debug(f"{path} already loaded")
         
     @property
     def user_grouped_df(self):
-        return self._df_grouped_by_user
+        return self._loaded[self._path]
 
     @property
     def path(self):
@@ -65,7 +82,8 @@ class FeaturesFile(FeaturesGroup):
             for feature in features
         ]
         
-        extracted_columns = self._df_grouped_by_user[features_columns].copy()
+        user_grouped_df = self.user_grouped_df
+        extracted_columns = user_grouped_df[features_columns].copy()
         for feature in features:
             extracted_columns[feature.column_name] = extracted_columns[feature.column_name].apply(feature.transformation)
         
@@ -83,9 +101,10 @@ class UsersFeaturesFile(FeaturesFile):
         super().__init__(os.path.join(path, "users.csv"))
     
     def _prepare_data(self):
-        self._df_grouped_by_user.fillna('', inplace=True)
-        self._df_grouped_by_user.rename(columns={"id": "user_id"}, inplace=True)
-        self._df_grouped_by_user.set_index('user_id', inplace=True)
+        user_grouped_df = self.user_grouped_df
+        user_grouped_df.fillna('', inplace=True)
+        user_grouped_df.rename(columns={"id": "user_id"}, inplace=True)
+        user_grouped_df.set_index('user_id', inplace=True)
     
 class FriendsFeaturesFile(FeaturesFile):
     
@@ -95,8 +114,8 @@ class FriendsFeaturesFile(FeaturesFile):
         super().__init__(os.path.join(path, "friends.csv"))
     
     def _prepare_data(self):
-        self._df_grouped_by_user.rename(columns={"source_id": "user_id"}, inplace=True)
-        self._df_grouped_by_user = self._df_grouped_by_user.groupby("user_id").agg(list)
+        self.user_grouped_df.rename(columns={"source_id": "user_id"}, inplace=True)
+        self._loaded[self._path] = self.user_grouped_df.groupby("user_id").agg(list)
     
 class FollowersFeaturesFile(FeaturesFile):
     
@@ -106,8 +125,8 @@ class FollowersFeaturesFile(FeaturesFile):
         super().__init__(os.path.join(path, "followers.csv"))
     
     def _prepare_data(self):
-        self._df_grouped_by_user.rename(columns={"source_id": "user_id"}, inplace=True)
-        self._df_grouped_by_user = self._df_grouped_by_user.groupby("user_id").agg(list)
+        self.user_grouped_df.rename(columns={"source_id": "user_id"}, inplace=True)
+        self._loaded[self._path] = self.user_grouped_df.groupby("user_id").agg(list)
     
 class TweetsFeaturesFile(FeaturesFile):
     
@@ -117,8 +136,9 @@ class TweetsFeaturesFile(FeaturesFile):
         super().__init__(os.path.join(path, "tweets.csv"))
     
     def _prepare_data(self):
-        self._df_grouped_by_user.fillna("", inplace=True)
-        self._df_grouped_by_user.set_index(["user_id", "id"], inplace=True)
+        user_grouped_df = self.user_grouped_df
+        user_grouped_df.fillna("", inplace=True)
+        user_grouped_df.set_index(["user_id", "id"], inplace=True)
 
 class Feature:
     

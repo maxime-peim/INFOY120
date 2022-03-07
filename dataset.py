@@ -64,7 +64,6 @@ class Dataset:
     @features_files.setter
     def features_files(self, features_files):
         paths = list(features_files.keys())
-        self._features_files = features_files
         self._set_from_paths(paths)
 
     @property
@@ -88,15 +87,7 @@ class Dataset:
         self._users = self._full_users
 
     def _set_from_paths(self, paths):
-        # remove paths that are not needed
-        # and keep ones that will not need reload
-        to_remove_paths = [
-            path
-            for path in self._features_files.keys()
-            if path not in paths
-        ]
-        for path in to_remove_paths:
-            del self._features_files[path]
+        self._features_files.clear()
         
         users_dfs = []
         for path in paths:
@@ -112,15 +103,12 @@ class Dataset:
                 
             self._names.add(name)
             
-            if path not in self._features_files:
-                print(f"Loading files from {path}... ", flush=True, end="")
-                self._features_files[path] = (
-                    ft.UsersFeaturesFile(path),
-                    ft.FriendsFeaturesFile(path),
-                    ft.FollowersFeaturesFile(path),
-                    ft.TweetsFeaturesFile(path)
-                ) if not utils.TESTING else ()
-                print("Done.", flush=True)
+            self._features_files[path] = (
+                ft.UsersFeaturesFile(path),
+                ft.FriendsFeaturesFile(path),
+                ft.FollowersFeaturesFile(path),
+                ft.TweetsFeaturesFile(path)
+            ) if not utils.TESTING else ()
 
         self._undersampled = False
         self._full_users= pd.concat(users_dfs) if len(users_dfs) > 0 else pd.DataFrame()
@@ -189,8 +177,7 @@ class Dataset:
         
         # save the users if undersampled before modifying
         undersampled_users = pd.concat((self.users, other.users))
-
-        self._features_files.update(other.features_files)
+        
         self.paths_to_csv = self.paths_to_csv + other.paths_to_csv
         self.users = undersampled_users
         
@@ -202,10 +189,9 @@ class Dataset:
         
         # save the users if undersampled before modifying
         undersampled_users = pd.concat((self.users, other.users))
-
-        new_dataset = type(self)()
-        # share the features files so they will not reload (time and memory savings)
-        new_dataset.features_files = {**self.features_files, **other.features_files}
+        
+        paths = self.paths_to_csv + other.paths_to_csv
+        new_dataset = type(self)(*paths)
         new_dataset.users = undersampled_users
 
         return new_dataset
