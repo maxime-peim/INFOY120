@@ -176,20 +176,39 @@ class Feature:
         
         return self.name == other.name
 
+string_empty = lambda x: len(str(x).strip()) == 0
 string_not_empty = lambda x: len(str(x).strip()) > 0
+identity = lambda x: x
 
 class_A = FeaturesGroup(group_name="Class A")
 class_B = FeaturesGroup(group_name="Class B")
 class_C = FeaturesGroup(group_name="Class C")
 set_CC = FeaturesGroup(group_name="Set CC")
 
-has_name = Feature("has_name", "name", string_not_empty, features_groups=[UsersFeaturesFile, class_A, set_CC])
-has_image = Feature("has_image", "default_profile_image", lambda x: x != 1, features_groups=[UsersFeaturesFile, class_A, set_CC])
-has_address = Feature("has_address", "location", string_not_empty, features_groups=[UsersFeaturesFile, class_A, set_CC])
-has_biography = Feature("has_biography", "description", string_not_empty, features_groups=[UsersFeaturesFile, class_A, set_CC])
-has_at_least_30_followers = Feature("has_at_least_30_followers", "followers_count", lambda x: x >= 30, features_groups=[UsersFeaturesFile, class_A, set_CC])
-has_been_listed = Feature("has_been_listed", "listed_count", lambda x: x > 0, features_groups=[UsersFeaturesFile, class_A, set_CC])
-has_at_least_50_tweets = Feature("has_at_least_50_tweets", "statuses_count", lambda x: x >= 50, features_groups=[UsersFeaturesFile, class_A, set_CC])
-has_enabled_geoloc = Feature("has_enabled_geoloc", "geo_enabled", lambda x: x == 1, features_groups=[UsersFeaturesFile, class_B, set_CC])
-has_url = Feature("has_url", "url", string_not_empty, features_groups=[UsersFeaturesFile, class_A, set_CC])
-has_2followers_greater_than_friends = Feature("has_2followers_greater_than_friends", ["followers_count", "friends_count"], lambda fol, fri: 2*fol >= fri, features_groups=[UsersFeaturesFile, class_A, set_CC])
+has_name = Feature("has_name", "name", string_not_empty, features_groups=[UsersFeaturesFile, class_A])
+has_image = Feature("has_image", "default_profile_image", lambda x: x != 1, features_groups=[UsersFeaturesFile, class_A])
+has_address = Feature("has_address", "location", string_not_empty, features_groups=[UsersFeaturesFile, class_A])
+has_biography = Feature("has_biography", "description", string_not_empty, features_groups=[UsersFeaturesFile, class_A])
+has_at_least_30_followers = Feature("has_at_least_30_followers", "followers_count", lambda x: x >= 30, features_groups=[UsersFeaturesFile, class_A])
+has_been_listed = Feature("has_been_listed", "listed_count", lambda x: x > 0, features_groups=[UsersFeaturesFile, class_A])
+has_at_least_50_tweets = Feature("has_at_least_50_tweets", "statuses_count", lambda x: x >= 50, features_groups=[UsersFeaturesFile, class_A])
+has_enabled_geoloc = Feature("has_enabled_geoloc", "geo_enabled", lambda x: x == 1, features_groups=[UsersFeaturesFile, class_B])
+has_url = Feature("has_url", "url", string_not_empty, features_groups=[UsersFeaturesFile, class_A])
+has_2followers_friends = Feature("has_2followers_friends", ["followers_count", "friends_count"], lambda fol, fri: 2*fol >= fri, features_groups=[UsersFeaturesFile, class_A])
+
+explicit_biography = Feature("explicit_biography", "description", lambda x: "bot" in x, features_groups=[UsersFeaturesFile, class_A])
+has_ratio_followers_friends_100 = Feature("has_ratio_followers_friends_100", ["followers_count", "friends_count"], lambda fol, fri: abs(fol - 100 * fri) <= 5 * fri, features_groups=[UsersFeaturesFile, class_A])
+# duplicate_pictures
+
+has_ratio_friends_followers_50 = Feature("has_ratio_friends_followers_50", ["followers_count", "friends_count"], lambda fol, fri: fri >= 50*fol, features_groups=[UsersFeaturesFile, class_A])
+no_bio_no_location_friends_100 = Feature("no_bio_no_location_friends_100", ["description", "location", "friends_count"], lambda bio, loc, fri: string_empty(bio) and string_empty(loc) and fri >= 100, features_groups=[UsersFeaturesFile, class_A])
+has_0_tweet = Feature("has_0_tweet", "statuses_count", lambda x: x == 0, features_groups=[UsersFeaturesFile, class_A])
+# default_image_after_2_months
+
+number_of_friends = Feature("number_of_friends", "friends_count", identity, features_groups=[UsersFeaturesFile, class_A])
+number_of_tweets = Feature("number_of_tweets", "statuses_count", identity, features_groups=[UsersFeaturesFile, class_A])
+ratio_friends_followers_square = Feature("ratio_friends_followers_square", ["followers_count", "friends_count"], lambda fol, fri: 0 if fol == 0 else fri / (fol * fol), features_groups=[UsersFeaturesFile, class_A])
+
+
+# age
+# following rate
