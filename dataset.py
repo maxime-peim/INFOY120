@@ -1,10 +1,13 @@
 import os
-import random
 
+import logging
 import pandas as pd
 
 import utils
 import feature as ft
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 class InvalidDatasetFolderError(Exception):
     pass
@@ -103,6 +106,7 @@ class Dataset:
                 
             self._names.add(name)
             
+            logger.debug(f"Loading features files from {path}...")
             self._features_files[path] = (
                 ft.UsersFeaturesFile(path),
                 ft.FriendsFeaturesFile(path),

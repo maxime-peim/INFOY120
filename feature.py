@@ -5,7 +5,6 @@ import logging
 import pandas as pd
 from timeit import default_timer as timer
 
-logging.basicConfig(stream=sys.stdout)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -54,16 +53,15 @@ class FeaturesFile(FeaturesGroup):
         
         self._path = os.path.abspath(path)
         if self._path not in self._loaded:
-            logger.debug(f"Loading file {path} ...")
             start_loading = timer()
             
             self._loaded[self._path] = pd.read_csv(self._path, encoding = "ISO-8859-1")
             self._prepare_data()
             
             end_loading = timer()
-            logger.debug(f"{path} loaded in {end_loading - start_loading:.2f}s")
+            logger.debug(f"{os.path.basename(path)} loaded in {end_loading - start_loading:.2f}s")
         else:
-            logger.debug(f"{path} already loaded")
+            logger.debug(f"{os.path.basename(path)} already loaded")
         
     @property
     def user_grouped_df(self):

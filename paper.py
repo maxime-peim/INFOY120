@@ -1,19 +1,22 @@
+import sys
+
+import logging
 from numpy import mean, std
 from sklearn.model_selection import cross_validate
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import precision_score, recall_score, f1_score, matthews_corrcoef, make_scorer
 
-import dataset as ds
-import feature as ft
+from dataset import Dataset
+from feature import class_A
 
 def build_paper_datasets():
     # building human dataset
-    HUM = ds.Dataset("datasets/human/E13",
+    HUM = Dataset("datasets/human/E13",
                      "datasets/human/TFP")
     HUM.name = "HUM"
 
     # building fake dataset
-    FAK = ds.Dataset("datasets/fake/FSF",
+    FAK = Dataset("datasets/fake/FSF",
                      "datasets/fake/INT",
                      "datasets/fake/TWT")
     FAK.name = "FAK"
@@ -27,9 +30,11 @@ def build_paper_datasets():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(stream=sys.stdout)
+    
     HUM, FAK, BAS = build_paper_datasets()
     
-    X, y = BAS.make_classification(ft.class_A)
+    X, y = BAS.make_classification(class_A)
     
     # https://machinelearningmastery.com/random-forest-ensemble-in-python/
     RF_model = RandomForestClassifier()
