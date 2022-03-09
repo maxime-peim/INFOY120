@@ -3,6 +3,11 @@ env/
 *.csv
 .vscode/
 
+.flake8
+.isort.cfg
+.markdownlint.yaml
+.trunk/
+
 TODO
 
 debug.py
