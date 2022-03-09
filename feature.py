@@ -1,28 +1,33 @@
+import os
 from collections import namedtuple
+from collections.abc import Hashable, Set
+from datetime import datetime
 
 ColumnToArg = namedtuple("ColumnToArg", ["column_name", "argument_name"])
 
 
-class FeaturesGroup:
-    def __init__(self, *features, name="Generic group"):
-        self.name = name
+class NamedSet(Hashable, Set):
+    __hash__ = Set._hash
 
-        self._features = set(features)
-        for feature in self._features:
-            self._features.add(feature)
+    def __init__(self, name="Generic group", iterable=()):
+        self._name = name
+        self.data = set(iterable)
 
     @property
-    def features(self):
-        return self._features
+    def name(self):
+        return self._name
 
-    def add_feature(self, feature):
-        self._features.add(feature)
+    def __contains__(self, value):
+        return value in self.data
 
     def __iter__(self):
-        return self._features.__iter__()
+        return iter(self.data)
 
-    def __next__(self):
-        return self._features.__next__()
+    def __len__(self):
+        return len(self.data)
+
+
+FeaturesGroup = NamedSet
 
 
 class Feature:
@@ -31,12 +36,6 @@ class Feature:
         self._to_extract = self._build_extraction_dict(columns)
         self._evaluate = self._evaluate_proxy(evaluate, complex)
 
-        self._groups = []
-
-    @property
-    def features_groups(self):
-        return self._groups
-
     @property
     def evaluate(self):
         return self._evaluate
@@ -44,9 +43,6 @@ class Feature:
     def needed_columns(self, datafile_prefix):
         columns_to_args = self._to_extract.get(datafile_prefix, [])
         return [column_to_arg.column_name for column_to_arg in columns_to_args]
-
-    def add_to_group(self, group):
-        self._groups.append(group)
 
     def _evaluate_proxy(self, evaluate, complex):
         if complex:
@@ -88,9 +84,6 @@ class Feature:
             raise NotImplementedError
 
         return self.name == other.name
-
-    def __str__(self):
-        return f"Feature {self.name} in groups {'/'.join(group.name for group in self._groups)}"
 
 
 def string_empty(string_arg):
@@ -134,7 +127,7 @@ has_2followers_friends = Feature(
 )
 
 explicit_biography = Feature(
-    "explicit_biography", lambda desc: "bot" in desc, desc="users/description"
+    "explicit_biography", lambda bio: "bot" in bio, bio="users/description"
 )
 has_ratio_followers_friends_100 = Feature(
     "has_ratio_followers_friends_100",
@@ -142,7 +135,19 @@ has_ratio_followers_friends_100 = Feature(
     fol="users/followers_count",
     fri="users/friends_count",
 )
-# duplicate_pictures
+
+
+def duplicate_pictures_func(dataframe):
+    images_df = dataframe["users_profile_image_url"].map(lambda x: os.path.basename(x))
+    return images_df.groupby(images_df).transform(len).map(lambda x: x > 1)
+
+
+duplicate_pictures = Feature(
+    "duplicate_pictures",
+    duplicate_pictures_func,
+    complex=True,
+    prof_img="users/profile_image_url",
+)
 
 has_ratio_friends_followers_50 = Feature(
     "has_ratio_friends_followers_50",
@@ -157,8 +162,30 @@ no_bio_no_location_friends_100 = Feature(
     loc="users/location",
     fri="users/friends_count",
 )
-has_0_tweet = Feature("has_0_tweet", lambda x: x == 0, x="users/statuses_count")
-# default_image_after_2_months
+has_0_tweet = Feature("has_0_tweet", lambda sta: sta == 0, sta="users/statuses_count")
+
+
+def age_func(crea):
+    paper_date = datetime(2015, 2, 14)
+    creation_date = datetime.strptime(crea, "%a %b %d %H:%M:%S +0000 %Y")
+
+    return (creation_date - paper_date).days
+
+
+def default_image_after_2_months_func(crea, default):
+    if not default:
+        return False
+
+    # roughly 2 months
+    return age_func(crea) >= 60
+
+
+default_image_after_2_months = Feature(
+    "default_image_after_2_months",
+    default_image_after_2_months_func,
+    crea="users/created_at",
+    default="users/default_profile_image",
+)
 
 number_of_friends = Feature("number_of_friends", identity, x="users/friends_count")
 number_of_tweets = Feature("number_of_tweets", identity, x="users/statuses_count")
@@ -170,30 +197,41 @@ ratio_friends_followers_square = Feature(
 )
 
 
-# age
-# following rate
+age = Feature("age", age_func, crea="users/created_at")
+following_rate = Feature(
+    "following_rate",
+    lambda crea, fri: fri / age_func(crea),
+    crea="users/created_at",
+    fri="users/friends_count",
+)
 
 class_A = FeaturesGroup(
-    has_name,
-    has_image,
-    has_address,
-    has_biography,
-    has_at_least_30_followers,
-    has_been_listed,
-    has_at_least_50_tweets,
-    has_enabled_geoloc,
-    has_url,
-    has_2followers_friends,
-    explicit_biography,
-    has_ratio_followers_friends_100,
-    has_ratio_friends_followers_50,
-    no_bio_no_location_friends_100,
-    has_0_tweet,
-    number_of_friends,
-    number_of_tweets,
-    ratio_friends_followers_square,
-    name="Class A",
+    "Class A",
+    [
+        has_name,
+        has_image,
+        has_address,
+        has_biography,
+        has_at_least_30_followers,
+        has_been_listed,
+        has_at_least_50_tweets,
+        has_enabled_geoloc,
+        has_url,
+        has_2followers_friends,
+        explicit_biography,
+        has_ratio_followers_friends_100,
+        duplicate_pictures,
+        has_ratio_friends_followers_50,
+        no_bio_no_location_friends_100,
+        has_0_tweet,
+        default_image_after_2_months,
+        number_of_friends,
+        number_of_tweets,
+        ratio_friends_followers_square,
+        age,
+        following_rate,
+    ],
 )
-class_B = FeaturesGroup(name="Class B")
-class_C = FeaturesGroup(name="Class C")
-set_CC = FeaturesGroup(name="Set CC")
+class_B = FeaturesGroup("Class B")
+class_C = FeaturesGroup("Class C")
+set_CC = FeaturesGroup("Set CC")
