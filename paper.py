@@ -1,24 +1,28 @@
+import logging
 import sys
 
-import logging
-from numpy import mean, std
-from sklearn.model_selection import cross_validate
+from numpy import mean
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import precision_score, recall_score, f1_score, matthews_corrcoef, make_scorer
+from sklearn.metrics import (
+    f1_score,
+    make_scorer,
+    matthews_corrcoef,
+    precision_score,
+    recall_score,
+)
+from sklearn.model_selection import cross_validate
 
 from dataset import Dataset
 from feature import class_A
 
+
 def build_paper_datasets():
     # building human dataset
-    HUM = Dataset("datasets/human/E13",
-                     "datasets/human/TFP")
+    HUM = Dataset("datasets/human/E13", "datasets/human/TFP")
     HUM.name = "HUM"
 
     # building fake dataset
-    FAK = Dataset("datasets/fake/FSF",
-                     "datasets/fake/INT",
-                     "datasets/fake/TWT")
+    FAK = Dataset("datasets/fake/FSF", "datasets/fake/INT", "datasets/fake/TWT")
     FAK.name = "FAK"
     FAK.undersample(HUM.size)
 
@@ -31,11 +35,11 @@ def build_paper_datasets():
 
 if __name__ == "__main__":
     logging.basicConfig(stream=sys.stdout)
-    
+
     HUM, FAK, BAS = build_paper_datasets()
-    
+
     X, y = BAS.make_classification(class_A)
-    
+
     # https://machinelearningmastery.com/random-forest-ensemble-in-python/
     RF_model = RandomForestClassifier()
     scoring = {
@@ -46,8 +50,10 @@ if __name__ == "__main__":
         "MCC": make_scorer(matthews_corrcoef),
         "AUC": "roc_auc"
     }
-    scores = cross_validate(RF_model, X, y, scoring=scoring, cv=10, n_jobs=-1, error_score='raise')
-    
+    scores = cross_validate(
+        RF_model, X, y, scoring=scoring, cv=10, n_jobs=-1, error_score="raise"
+    )
+
     for score_name, values in scores.items():
         if score_name.startswith("test_"):
             print(f"{score_name[5:]}: {mean(values):.4f}")
