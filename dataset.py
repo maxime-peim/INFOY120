@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Union
 
 import pandas as pd
 
 import datafile as df
+import feature as ft
 
 if TYPE_CHECKING:
     import numpy as np
-
-    import feature as ft
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -257,21 +256,24 @@ class Dataset:
             self._undersampled = True
 
     def make_classification(
-        self, features_group: ft.FeaturesGroup
+        self, features: Union[ft.Feature, ft.FeaturesGroup]
     ) -> tuple[np.ndarray, np.ndarray]:
         """Extract features from the dataset.
         It returns the features evaluation for each user of the dataset, and the label associated.
 
         Args:
-            features_group (ft.FeaturesGroup): a group of features to extract.
+            features (Union[ft.Feature, ft.FeaturesGroup]): a group of features to extract.
 
         Returns:
             tuple[np.ndarray, np.ndarray]: the first numpy ndarray contains the different features evaluation, and the second the label for each user.
         """
         users_features = []
 
+        if isinstance(features, ft.Feature):
+            features = ft.FeaturesGroup(iterable=[features])
+
         for datafiles in self._datafiles.values():
-            sub_users_features = datafiles.extract(features_group)
+            sub_users_features = datafiles.extract(features)
             users_features.append(sub_users_features)
 
         X = pd.concat(users_features)
