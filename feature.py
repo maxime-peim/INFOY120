@@ -329,7 +329,7 @@ same_tweets_3 = Feature(
 
 def spam_tweets_func(dataframe):
     tweets_df = dataframe.explode("tweets_text")["tweets_text"]
-    return tweets_df.groupby(tweets_df).transform(len).map(lambda x: x > 1)
+    return tweets_df.transform(len).groupby("user_id").agg(max)
 
 
 spam_tweets = Feature(
@@ -353,18 +353,40 @@ urls_ratio = Feature(
 )
 
 
-def tweets_similarity_func(dataframe):
-    tweets_df = dataframe.explode("tweets_text")["tweets_text"]
-    return tweets_df.groupby(tweets_df).transform(len)
+def tweets_similarity_func(tweets, created):
+    last_15 = [
+        t.lower()
+        for t, _ in sorted(
+            zip(tweets, created),
+            key=lambda x: datetime.strptime(x[1], "%a %b %d %H:%M:%S +0000 %Y"),
+        )
+    ][-15:]
+    consecutives = []
+    for tweet in last_15:
+        four_consecutive = []
+        for word in tweet.split():
+            four_consecutive.append(word)
+            if len(four_consecutive) > 4:
+                four_consecutive.pop(0)
+
+            word4 = "".join(four_consecutive)
+            if word4 in consecutives:
+                return True
+
+            if len(four_consecutive) == 4:
+                consecutives.append(word4)
+    return False
 
 
 tweets_similarity = Feature(
-    "tweets_similarity", tweets_similarity_func, complex=True, tweets="tweets/text"
+    "tweets_similarity",
+    tweets_similarity_func,
+    tweets="tweets/text",
+    created="tweets/created_at",
 )
 api_ratio = Feature(
     "api_ratio",
-    lambda sources: sum(uses_api_func(source) for source in sources)
-    / len(sources),
+    lambda sources: sum(uses_api_func(source) for source in sources) / len(sources),
     sources="tweets/source",
 )
 uses_api = Feature(
@@ -400,14 +422,14 @@ class_B = FeaturesGroup(
         at_least_1_retweets,
         same_tweets,
         same_tweets_3,
-        #spam_tweets,
+        spam_tweets,
         retweet_90,
         urls_90,
         urls_ratio,
-        #tweets_similarity,
+        tweets_similarity,
         api_ratio,
         uses_api,
-        api_urls_ratio
+        api_urls_ratio,
     ],
 )
 class_C = FeaturesGroup("Class C")
