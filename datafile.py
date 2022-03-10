@@ -87,28 +87,27 @@ class FollowersDatafile(Datafile, prefix="followers"):
 
 class TweetsDatafile(Datafile, prefix="tweets"):
     def _prepare_data(self):
-        user_grouped_df = self.user_grouped_df
-        user_grouped_df.fillna("", inplace=True)
-        user_grouped_df.set_index(["user_id", "id"], inplace=True)
+        self.user_grouped_df.fillna("", inplace=True)
+        self._loaded[self._path] = self.user_grouped_df.groupby("user_id").agg(list)
 
 
 @dataclass
 class MinimalDatafiles:
-    path: InitVar[str] = None
+    path: str
     files: dict = field(init=False)
     users: UsersDatafile = field(init=False)
     friends: FriendsDatafile = field(init=False)
     followers: FollowersDatafile = field(init=False)
     tweets: TweetsDatafile = field(init=False)
 
-    def __post_init__(self, path):
-        if path is None:
+    def __post_init__(self):
+        if self.path is None:
             raise ValueError("Cannot load datafiles without path.")
 
-        self.users = UsersDatafile(path)
-        self.friends = FriendsDatafile(path)
-        self.followers = FollowersDatafile(path)
-        self.tweets = TweetsDatafile(path)
+        self.users = UsersDatafile(self.path)
+        self.friends = FriendsDatafile(self.path)
+        self.followers = FollowersDatafile(self.path)
+        self.tweets = TweetsDatafile(self.path)
 
         self.files = {
             self.users.prefix: self.users,
@@ -118,10 +117,12 @@ class MinimalDatafiles:
         }
 
     def extract(self, features_group):
+        logger.debug(f"Extracting {len(features_group)} from {self.path}...")
         users_index = self.users.user_grouped_df.index
         extracted_features = []
 
-        for feature in features_group:
+        for i, feature in enumerate(features_group):
+            logger.debug(f"{i+1}/{len(features_group)} Extracting feature: {feature.name}...")
             extracted = []
             for prefix, datafile in self.files.items():
                 columns_names = feature.needed_columns(prefix)

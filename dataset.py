@@ -164,7 +164,7 @@ class Dataset:
 
             self._names.add(name)
 
-            logger.debug(f"Loading features files from {path}...")
+            logger.debug(f"Loading datafiles from {path}...")
             self._datafiles[path] = df.MinimalDatafiles(path)
 
         self._undersampled = False
@@ -277,7 +277,7 @@ class Dataset:
             users_features.append(sub_users_features)
 
         X = pd.concat(users_features)
-        X = X.reindex(self._users.index)
+        X = X.reindex(self._users.index).fillna(0)
         return X.to_numpy(), self._users["label"].to_numpy(copy=True)
 
     def __iadd__(self, other: Any) -> Dataset:

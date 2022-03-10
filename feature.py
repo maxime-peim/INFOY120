@@ -2,6 +2,7 @@ import os
 from collections import namedtuple
 from collections.abc import Hashable, Set
 from datetime import datetime
+from functools import partial
 
 ColumnToArg = namedtuple("ColumnToArg", ["column_name", "argument_name"])
 
@@ -115,9 +116,6 @@ has_been_listed = Feature(
 has_at_least_50_tweets = Feature(
     "has_at_least_50_tweets", lambda sta: sta >= 50, sta="users/statuses_count"
 )
-has_enabled_geoloc = Feature(
-    "has_enabled_geoloc", lambda geo: geo == 1, geo="users/geo_enabled"
-)
 has_url = Feature("has_url", string_not_empty, string_arg="users/url")
 has_2followers_friends = Feature(
     "has_2followers_friends",
@@ -215,7 +213,6 @@ class_A = FeaturesGroup(
         has_at_least_30_followers,
         has_been_listed,
         has_at_least_50_tweets,
-        has_enabled_geoloc,
         has_url,
         has_2followers_friends,
         explicit_biography,
@@ -232,6 +229,186 @@ class_A = FeaturesGroup(
         following_rate,
     ],
 )
-class_B = FeaturesGroup("Class B")
+
+has_enabled_geoloc = Feature(
+    "has_enabled_geoloc", lambda geo: geo == 1, geo="users/geo_enabled"
+)
+is_favourite = Feature(
+    "is_favourite", lambda fav: fav > 0, fav="users/favourites_count"
+)
+uses_hashtag = Feature(
+    "uses_hashtag",
+    lambda tweets: any("#" in tweet for tweet in tweets),
+    tweets="tweets/text",
+)
+
+
+def uses_platform_func(source, platform):
+    return platform.lower() in source.lower()
+
+
+def is_platform_max(sources, platform_func):
+    return platform_func(max(sources, key=sources.count))
+
+
+uses_iphone_func = partial(uses_platform_func, platform="iphone")
+uses_android_func = partial(uses_platform_func, platform="android")
+uses_instagram_func = partial(uses_platform_func, platform="instagram")
+uses_foursquare_func = partial(uses_platform_func, platform="foursquare")
+uses_twitter_func = partial(uses_platform_func, platform="web")
+
+
+def uses_other_func(source):
+    return not (
+        uses_iphone_func(source)
+        or uses_android_func(source)
+        or uses_instagram_func(source)
+        or uses_foursquare_func(source)
+        or uses_twitter_func(source)
+    )
+
+
+def uses_api_func(source):
+    return not uses_twitter_func(source)
+
+
+uses_iphone = Feature(
+    "uses_iphone",
+    partial(is_platform_max, platform_func=uses_iphone_func),
+    sources="tweets/source",
+)
+uses_android = Feature(
+    "uses_android",
+    partial(is_platform_max, platform_func=uses_android_func),
+    sources="tweets/source",
+)
+uses_instagram = Feature(
+    "uses_instagram",
+    partial(is_platform_max, platform_func=uses_instagram_func),
+    sources="tweets/source",
+)
+uses_foursquare = Feature(
+    "uses_foursquare",
+    partial(is_platform_max, platform_func=uses_foursquare_func),
+    sources="tweets/source",
+)
+uses_twitter = Feature(
+    "uses_twitter",
+    partial(is_platform_max, platform_func=uses_twitter_func),
+    sources="tweets/source",
+)
+uses_other = Feature(
+    "uses_other",
+    partial(is_platform_max, platform_func=uses_other_func),
+    sources="tweets/source",
+)
+user_id_in_tweets = Feature(
+    "user_id_in_tweets",
+    lambda tweets: any("@" in tweet for tweet in tweets),
+    tweets="tweets/text",
+)
+urls_in_tweets = Feature(
+    "user_id_tweets",
+    lambda tweets: any("http" in tweet for tweet in tweets),
+    tweets="tweets/text",
+)
+at_least_1_retweets = Feature(
+    "at_least_1_retweets",
+    lambda tweets: any(tweet.startswith("RT @") for tweet in tweets),
+    tweets="tweets/text",
+)
+same_tweets = Feature(
+    "same_tweets", lambda tweets: len(set(tweets)) != len(tweets), tweets="tweets/text"
+)
+same_tweets_3 = Feature(
+    "same_tweets_3",
+    lambda tweets: tweets.count(max(tweets, key=tweets.count)) >= 3,
+    tweets="tweets/text",
+)
+
+
+def spam_tweets_func(dataframe):
+    tweets_df = dataframe.explode("tweets_text")["tweets_text"]
+    return tweets_df.groupby(tweets_df).transform(len).map(lambda x: x > 1)
+
+
+spam_tweets = Feature(
+    "spam_tweets", spam_tweets_func, complex=True, tweets="tweets/text"
+)
+retweet_90 = Feature(
+    "retweet_90",
+    lambda tweets: sum(tweet.startswith("RT @") for tweet in tweets)
+    >= 0.9 * len(tweets),
+    tweets="tweets/text",
+)
+urls_90 = Feature(
+    "urls_90",
+    lambda tweets: sum("http" in tweet for tweet in tweets) >= 0.9 * len(tweets),
+    tweets="tweets/text",
+)
+urls_ratio = Feature(
+    "urls_ratio",
+    lambda tweets: sum("http" in tweet for tweet in tweets) / len(tweets),
+    tweets="tweets/text",
+)
+
+
+def tweets_similarity_func(dataframe):
+    tweets_df = dataframe.explode("tweets_text")["tweets_text"]
+    return tweets_df.groupby(tweets_df).transform(len)
+
+
+tweets_similarity = Feature(
+    "tweets_similarity", tweets_similarity_func, complex=True, tweets="tweets/text"
+)
+api_ratio = Feature(
+    "api_ratio",
+    lambda sources: sum(uses_api_func(source) for source in sources)
+    / len(sources),
+    sources="tweets/source",
+)
+uses_api = Feature(
+    "uses_api",
+    partial(is_platform_max, platform_func=uses_api_func),
+    sources="tweets/source",
+)
+api_urls_ratio = Feature(
+    "api_urls_ratio",
+    lambda tweets, sources: sum(
+        "http" in tweet and uses_api_func(source)
+        for tweet, source in zip(tweets, sources)
+    )
+    / len(tweets),
+    tweets="tweets/text",
+    sources="tweets/source",
+)
+
+class_B = FeaturesGroup(
+    "Class B",
+    [
+        has_enabled_geoloc,
+        is_favourite,
+        uses_hashtag,
+        uses_iphone,
+        uses_android,
+        uses_instagram,
+        uses_foursquare,
+        uses_twitter,
+        uses_other,
+        user_id_in_tweets,
+        urls_in_tweets,
+        at_least_1_retweets,
+        same_tweets,
+        same_tweets_3,
+        #spam_tweets,
+        retweet_90,
+        urls_90,
+        urls_ratio,
+        #tweets_similarity,
+        api_ratio,
+        uses_api,
+        api_urls_ratio
+    ],
+)
 class_C = FeaturesGroup("Class C")
 set_CC = FeaturesGroup("Set CC")
