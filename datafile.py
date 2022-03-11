@@ -71,16 +71,26 @@ class UsersDatafile(Datafile, prefix="users"):
 
 class FriendsDatafile(Datafile, prefix="friends"):
     def _prepare_data(self):
+        """We assumed that the file friends.csv contains a list of link as A follows B
+        (it can be confirmed by comparing the number of followers in users.csv).
+        Hence to build a list of friends for each user, the source_id column is taken as
+        user_id index.
+        """
         self.user_grouped_df.rename(
-            columns={"source_id": "user_id", "target_id": "friend_id"}, inplace=True
+            columns={"source_id": "user_id", "target_id": "friends_id"}, inplace=True
         )
         self._loaded[self._path] = self.user_grouped_df.groupby("user_id").agg(list)
 
 
 class FollowersDatafile(Datafile, prefix="followers"):
     def _prepare_data(self):
+        """We assumed that the file followers.csv contains a list of link as A follows B
+        (it can be confirmed by comparing the number of followers in users.csv).
+        Hence to build a list of followers for each user, the target_id column is taken as
+        user_id index.
+        """
         self.user_grouped_df.rename(
-            columns={"target_id": "user_id", "source_id": "follower_id"}, inplace=True
+            columns={"target_id": "user_id", "source_id": "followers_id"}, inplace=True
         )
         self._loaded[self._path] = self.user_grouped_df.groupby("user_id").agg(list)
 
@@ -116,23 +126,14 @@ class MinimalDatafiles:
             self.tweets.prefix: self.tweets,
         }
 
-    def extract(self, features_group):
-        logger.debug(f"Extracting {len(features_group)} from {self.path}...")
+    def extract(self, feature):
         users_index = self.users.user_grouped_df.index
-        extracted_features = []
+        extracted_columns = []
+        for prefix, datafile in self.files.items():
+            columns_names = feature.needed_columns(prefix)
+            if len(columns_names) > 0:
+                columns = datafile.extract(columns_names)
+                if not columns.empty:
+                    extracted_columns.append(columns)
 
-        for i, feature in enumerate(features_group):
-            logger.debug(f"{i+1}/{len(features_group)} Extracting feature: {feature.name}...")
-            extracted = []
-            for prefix, datafile in self.files.items():
-                columns_names = feature.needed_columns(prefix)
-                if len(columns_names) > 0:
-                    columns = datafile.extract(columns_names)
-                    if not columns.empty:
-                        extracted.append(columns)
-
-            feature_result = feature.evaluate(pd.concat(extracted, axis=1))
-            extracted_features.append(feature_result)
-
-        features_result = pd.concat(extracted_features, axis=1)
-        return features_result.reindex(index=users_index)
+        return pd.concat(extracted_columns, axis=1).reindex(index=users_index)

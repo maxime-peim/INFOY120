@@ -267,16 +267,26 @@ class Dataset:
         Returns:
             tuple[np.ndarray, np.ndarray]: the first numpy ndarray contains the different features evaluation, and the second the label for each user.
         """
+
         users_features = []
 
         if isinstance(features, ft.Feature):
             features = ft.FeaturesGroup(iterable=[features])
 
-        for datafiles in self._datafiles.values():
-            sub_users_features = datafiles.extract(features)
-            users_features.append(sub_users_features)
+        logger.debug(f"Evaluating {len(features)} features from {features.name}:")
 
-        X = pd.concat(users_features)
+        for i, feature in enumerate(features):
+            extracted = []
+            logger.debug(
+                f"{i+1}/{len(features)} Extracting '{feature.name}' needed columns ..."
+            )
+            for datafiles in self._datafiles.values():
+                extracted_columns = datafiles.extract(feature)
+                extracted.append(extracted_columns)
+            logger.debug(f"Evaluating '{feature.name}' ...")
+            users_features.append(feature.evaluate(pd.concat(extracted)))
+
+        X = pd.concat(users_features, axis=1)
         X = X.reindex(self._users.index).fillna(0)
         return X.to_numpy(), self._users["label"].to_numpy(copy=True)
 
