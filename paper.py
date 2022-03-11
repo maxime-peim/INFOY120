@@ -13,7 +13,7 @@ from sklearn.metrics import (
 from sklearn.model_selection import cross_validate
 
 from dataset import Dataset
-from feature import class_A
+from feature import class_A, class_B, class_C
 
 
 def build_paper_datasets():
@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     HUM, FAK, BAS = build_paper_datasets()
 
-    X, y = BAS.make_classification(class_A)
+    X, y = BAS.make_classification(class_A | class_B | class_C)
 
     # https://machinelearningmastery.com/random-forest-ensemble-in-python/
     RF_model = RandomForestClassifier()
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         "Recall": make_scorer(recall_score, pos_label="human"),
         "F-M": make_scorer(f1_score, pos_label="human"),
         "MCC": make_scorer(matthews_corrcoef),
-        "AUC": "roc_auc"
+        "AUC": "roc_auc",
     }
     scores = cross_validate(
         RF_model, X, y, scoring=scoring, cv=10, n_jobs=-1, error_score="raise"

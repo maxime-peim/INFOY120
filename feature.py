@@ -4,6 +4,9 @@ from collections.abc import Hashable, Set
 from datetime import datetime
 from functools import partial
 
+import numpy as np
+import pandas as pd
+
 ColumnToArg = namedtuple("ColumnToArg", ["column_name", "argument_name"])
 
 
@@ -26,6 +29,17 @@ class NamedSet(Hashable, Set):
 
     def __len__(self):
         return len(self.data)
+
+    def __or__(self, other):
+        if not isinstance(other, (set, NamedSet)):
+            raise NotImplementedError
+
+        return NamedSet(
+            name=f"{self.name} U {other.name}", iterable=self.data.union(other)
+        )
+
+    def __str__(self):
+        return f"NamedSet {self.name} = {{{', '.join(str(d) for d in self.data)}}}"
 
 
 FeaturesGroup = NamedSet
@@ -85,6 +99,9 @@ class Feature:
             raise NotImplementedError
 
         return self.name == other.name
+
+    def __str__(self):
+        return self.name
 
 
 def string_empty(string_arg):
@@ -238,7 +255,7 @@ is_favourite = Feature(
 )
 uses_hashtag = Feature(
     "uses_hashtag",
-    lambda tweets: any("#" in tweet for tweet in tweets),
+    lambda tweets: False if tweets is np.nan else any("#" in tweet for tweet in tweets),
     tweets="tweets/text",
 )
 
@@ -248,7 +265,9 @@ def uses_platform_func(source, platform):
 
 
 def is_platform_max(sources, platform_func):
-    return platform_func(max(sources, key=sources.count))
+    return (
+        False if sources is np.nan else platform_func(max(sources, key=sources.count))
+    )
 
 
 uses_iphone_func = partial(uses_platform_func, platform="iphone")
@@ -304,32 +323,44 @@ uses_other = Feature(
 )
 user_id_in_tweets = Feature(
     "user_id_in_tweets",
-    lambda tweets: any("@" in tweet for tweet in tweets),
+    lambda tweets: False if tweets is np.nan else any("@" in tweet for tweet in tweets),
     tweets="tweets/text",
 )
 urls_in_tweets = Feature(
     "user_id_tweets",
-    lambda tweets: any("http" in tweet for tweet in tweets),
+    lambda tweets: False
+    if tweets is np.nan
+    else any("http" in tweet for tweet in tweets),
     tweets="tweets/text",
 )
 at_least_1_retweets = Feature(
     "at_least_1_retweets",
-    lambda tweets: any(tweet.startswith("RT @") for tweet in tweets),
+    lambda tweets: False
+    if tweets is np.nan
+    else any(tweet.startswith("RT @") for tweet in tweets),
     tweets="tweets/text",
 )
 same_tweets = Feature(
-    "same_tweets", lambda tweets: len(set(tweets)) != len(tweets), tweets="tweets/text"
+    "same_tweets",
+    lambda tweets: False if tweets is np.nan else len(set(tweets)) != len(tweets),
+    tweets="tweets/text",
 )
 same_tweets_3 = Feature(
     "same_tweets_3",
-    lambda tweets: tweets.count(max(tweets, key=tweets.count)) >= 3,
+    lambda tweets: False
+    if tweets is np.nan
+    else tweets.count(max(tweets, key=tweets.count)) >= 3,
     tweets="tweets/text",
 )
 
 
 def spam_tweets_func(dataframe):
     tweets_df = dataframe.explode("tweets_text")["tweets_text"]
-    return tweets_df.transform(len).groupby("user_id").agg(max)
+    return (
+        tweets_df.transform(lambda x: 0 if x is np.nan else len(x))
+        .groupby("user_id")
+        .agg(max)
+    )
 
 
 spam_tweets = Feature(
@@ -337,23 +368,31 @@ spam_tweets = Feature(
 )
 retweet_90 = Feature(
     "retweet_90",
-    lambda tweets: sum(tweet.startswith("RT @") for tweet in tweets)
-    >= 0.9 * len(tweets),
+    lambda tweets: 0
+    if tweets is np.nan
+    else sum(tweet.startswith("RT @") for tweet in tweets) >= 0.9 * len(tweets),
     tweets="tweets/text",
 )
 urls_90 = Feature(
     "urls_90",
-    lambda tweets: sum("http" in tweet for tweet in tweets) >= 0.9 * len(tweets),
+    lambda tweets: False
+    if tweets is np.nan
+    else sum("http" in tweet for tweet in tweets) >= 0.9 * len(tweets),
     tweets="tweets/text",
 )
 urls_ratio = Feature(
     "urls_ratio",
-    lambda tweets: sum("http" in tweet for tweet in tweets) / len(tweets),
+    lambda tweets: 0
+    if tweets is np.nan
+    else sum("http" in tweet for tweet in tweets) / len(tweets),
     tweets="tweets/text",
 )
 
 
 def tweets_similarity_func(tweets, created):
+    if tweets is np.nan or created is np.nan:
+        return False
+
     last_15 = [
         t.lower()
         for t, _ in sorted(
@@ -386,7 +425,9 @@ tweets_similarity = Feature(
 )
 api_ratio = Feature(
     "api_ratio",
-    lambda sources: sum(uses_api_func(source) for source in sources) / len(sources),
+    lambda sources: 0
+    if sources is np.nan
+    else sum(uses_api_func(source) for source in sources) / len(sources),
     sources="tweets/source",
 )
 uses_api = Feature(
@@ -396,12 +437,22 @@ uses_api = Feature(
 )
 api_urls_ratio = Feature(
     "api_urls_ratio",
-    lambda tweets, sources: sum(
+    lambda tweets, sources: 0
+    if sources is np.nan or tweets is np.nan
+    else sum(
         "http" in tweet and uses_api_func(source)
         for tweet, source in zip(tweets, sources)
     )
     / len(tweets),
     tweets="tweets/text",
+    sources="tweets/source",
+)
+api_tweets_similarity = Feature(
+    "api_tweets_similarity",
+    lambda tweets, created, sources: is_platform_max(sources, uses_api_func)
+    and tweets_similarity_func(tweets, created),
+    tweets="tweets/text",
+    created="tweets/created_at",
     sources="tweets/source",
 )
 
@@ -430,7 +481,120 @@ class_B = FeaturesGroup(
         api_ratio,
         uses_api,
         api_urls_ratio,
+        api_tweets_similarity,
     ],
 )
-class_C = FeaturesGroup("Class C")
+
+
+def bidirectional_link_ratio_func(dataframe):
+    def bidirectional_ratio(friends, followers):
+        # if a user has no friend or follower
+        if friends is np.nan or followers is np.nan:
+            return 0
+        # else get the intersection of his friends and followers
+        # to have the number of bidirectional links
+        return len((set(friends)).intersection(set(followers))) / len(friends)
+
+    return dataframe.apply(
+        lambda row: bidirectional_ratio(
+            row.friends_friends_id, row.followers_followers_id
+        ),
+        axis=1,
+    )
+
+
+bidirectional_link_ratio = Feature(
+    "bidirectional_link_ratio",
+    bidirectional_link_ratio_func,
+    complex=True,
+    friends="friends/friends_id",
+    followers="followers/followers_id",
+)
+
+
+def average_neighbors_followers_func(dataframe):
+    def mean_followers_of_friends(friends, followers_count):
+        if friends is np.nan or followers_count is np.nan:
+            return 0
+        friends_index = pd.Index(set(friends))
+        index = friends_index.intersection(followers_count.index)
+        return followers_count.loc[index].mean()
+
+    mean_followers = partial(
+        mean_followers_of_friends, followers_count=dataframe["users_followers_count"]
+    )
+    return dataframe["friends_friends_id"].apply(
+        lambda friends: mean_followers(friends)
+    )
+
+
+average_neighbors_followers = Feature(
+    "average_neighbor_followers",
+    average_neighbors_followers_func,
+    complex=True,
+    friends="friends/friends_id",
+    followers_count="users/followers_count",
+)
+
+
+def average_neighbors_tweets_func(dataframe):
+    def mean_tweets_of_followers(followers, tweets_count):
+        if followers is np.nan or tweets_count is np.nan:
+            return 0
+        followers_index = pd.Index(set(followers))
+        index = followers_index.intersection(tweets_count.index)
+        return tweets_count.loc[index].mean()
+
+    mean_tweets = partial(
+        mean_tweets_of_followers, tweets_count=dataframe["users_statuses_count"]
+    )
+    return dataframe["followers_followers_id"].apply(
+        lambda followers: mean_tweets(followers)
+    )
+
+
+average_neighbors_tweets = Feature(
+    "average_neighbors_tweets",
+    average_neighbors_tweets_func,
+    complex=True,
+    followers="followers/followers_id",
+    tweets_count="users/statuses_count",
+)
+
+
+def following_to_median_followers_func(dataframe):
+    def friends_to_median_followers_of_friends(friends, followers_count):
+        if friends is np.nan or followers_count is np.nan:
+            return 0
+        friends_index = pd.Index(set(friends))
+        index = friends_index.intersection(followers_count.index)
+        median = followers_count.loc[index].median()
+        return 0 if median == 0 else len(friends_index) / median
+
+    median_followers_ratio = partial(
+        friends_to_median_followers_of_friends,
+        followers_count=dataframe["users_followers_count"],
+    )
+    return dataframe["friends_friends_id"].apply(
+        lambda friends: median_followers_ratio(friends)
+    )
+
+
+following_to_median_followers = Feature(
+    "following_to_median_followers",
+    following_to_median_followers_func,
+    complex=True,
+    friends="friends/friends_id",
+    followers_count="users/followers_count",
+)
+
+class_C = FeaturesGroup(
+    "Class C",
+    [
+        bidirectional_link_ratio,
+        average_neighbors_followers,
+        average_neighbors_tweets,
+        following_to_median_followers,
+    ],
+)
 set_CC = FeaturesGroup("Set CC")
