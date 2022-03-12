@@ -1,6 +1,8 @@
 import os
+import re
+import string
 from collections import namedtuple
-from collections.abc import Hashable, Set
+from collections.abc import Hashable, MutableSet
 from datetime import datetime
 from functools import partial
 
@@ -10,8 +12,8 @@ import pandas as pd
 ColumnToArg = namedtuple("ColumnToArg", ["column_name", "argument_name"])
 
 
-class NamedSet(Hashable, Set):
-    __hash__ = Set._hash
+class NamedSet(Hashable, MutableSet):
+    __hash__ = MutableSet._hash
 
     def __init__(self, name="Generic group", iterable=()):
         self._name = name
@@ -31,25 +33,37 @@ class NamedSet(Hashable, Set):
         return len(self.data)
 
     def __or__(self, other):
-        if not isinstance(other, (set, NamedSet)):
+        if not isinstance(other, (set, NamedSet, type(self))):
             raise NotImplementedError
 
-        return NamedSet(
+        return type(self)(
             name=f"{self.name} U {other.name}", iterable=self.data.union(other)
         )
 
+    def add(self, element):
+        self.data.add(element)
+
+    def discard(self, element):
+        return self.data.discard(element)
+
     def __str__(self):
-        return f"NamedSet {self.name} = {{{', '.join(str(d) for d in self.data)}}}"
+        return f"{self.name} = {{{', '.join(str(d) for d in self.data)}}}"
 
 
-FeaturesGroup = NamedSet
+class FeaturesGroup(NamedSet):
+    @property
+    def names(self):
+        return [feature.name for feature in self]
 
 
 class Feature:
+    registered = {}
+
     def __init__(self, name, evaluate, *, complex=False, **columns):
         self.name = name
         self._to_extract = self._build_extraction_dict(columns)
         self._evaluate = self._evaluate_proxy(evaluate, complex)
+        self.registered[self.name] = self
 
     @property
     def evaluate(self):
@@ -60,8 +74,6 @@ class Feature:
         return [column_to_arg.column_name for column_to_arg in columns_to_args]
 
     def _evaluate_proxy(self, evaluate, complex):
-        if complex:
-            return evaluate
 
         arg_column_mapping = {
             column_to_arg.argument_name: f"{class_prefix}_{column_to_arg.column_name}"
@@ -69,14 +81,18 @@ class Feature:
             for column_to_arg in columns_to_args
         }
 
-        def evaluate_wrapper(dataframe):
-            def evaluate_row(row):
-                kwargs = {
-                    arg: row[column] for arg, column in arg_column_mapping.items()
-                }
-                return evaluate(**kwargs)
+        def evaluate_row(row):
+            kwargs = {arg: row[column] for arg, column in arg_column_mapping.items()}
+            return evaluate(**kwargs)
 
-            return dataframe.apply(evaluate_row, axis=1)
+        def evaluate_wrapper(dataframe):
+            if complex:
+                result = evaluate(dataframe)
+            else:
+                result = dataframe.apply(evaluate_row, axis=1)
+
+            result.rename(self.name, inplace=True)
+            return result
 
         return evaluate_wrapper
 
@@ -102,6 +118,9 @@ class Feature:
 
     def __str__(self):
         return self.name
+
+    def __repr__(self):
+        return f"Feature('{self.name}')"
 
 
 def string_empty(string_arg):
@@ -252,6 +271,15 @@ has_enabled_geoloc = Feature(
 )
 is_favourite = Feature(
     "is_favourite", lambda fav: fav > 0, fav="users/favourites_count"
+)
+
+PUNCTUATION_PATTERN = re.compile("[" + re.escape(string.punctuation) + "]")
+uses_punctuation = Feature(
+    "uses_punctuation",
+    lambda tweets: False
+    if tweets is np.nan
+    else any(PUNCTUATION_PATTERN.search(tweet) is not None for tweet in tweets),
+    tweets="tweets/text",
 )
 uses_hashtag = Feature(
     "uses_hashtag",
@@ -461,6 +489,7 @@ class_B = FeaturesGroup(
     [
         has_enabled_geoloc,
         is_favourite,
+        uses_punctuation,
         uses_hashtag,
         uses_iphone,
         uses_android,
@@ -597,4 +626,30 @@ class_C = FeaturesGroup(
         following_to_median_followers,
     ],
 )
-set_CC = FeaturesGroup("Set CC")
+
+all_features = FeaturesGroup("All", class_A | class_B | class_C)
+set_Y = FeaturesGroup(
+    "Set Yang and al",
+    [
+        age,
+        bidirectional_link_ratio,
+        average_neighbors_followers,
+        average_neighbors_tweets,
+        following_to_median_followers,
+        api_ratio,
+        api_urls_ratio,
+        api_tweets_similarity,
+        following_rate,
+    ],
+)
+
+set_S = FeaturesGroup(
+    "Set Stringhini and al",
+    [
+        number_of_friends,
+        number_of_tweets,
+        tweets_similarity,
+        urls_ratio,
+        ratio_friends_followers_square,
+    ],
+)
