@@ -255,7 +255,7 @@ class Dataset:
             self._users = self._full_users.sample(n=num_users)
             self._undersampled = True
 
-    def make_classification(
+    def evaluate_features(
         self, features: Union[ft.Feature, ft.FeaturesGroup]
     ) -> tuple[np.ndarray, np.ndarray]:
         """Extract features from the dataset.
@@ -288,7 +288,7 @@ class Dataset:
 
         X = pd.concat(users_features, axis=1)
         X = X.reindex(self._users.index).fillna(0)
-        return X.to_numpy(), self._users["label"].to_numpy(copy=True)
+        return X, self._users["label"].copy()
 
     def __iadd__(self, other: Any) -> Dataset:
         """In-place union of two datasets.
