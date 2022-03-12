@@ -1,0 +1,24 @@
+Accuracy: 0.99230769
+Precision: 0.99085920
+Recall: 0.99384615
+F-M: 0.99229243
+MCC: 0.98473322
+AUC: 0.99971203
+
+bidirectional_link_ratio
+ratio_friends_followers_square
+number_of_tweets
+api_urls_ratio
+api_ratio
+has_at_least_30_followers
+urls_ratio
+average_neighbor_followers
+spam_tweets
+following_rate
+has_been_listed
+same_tweets
+has_enabled_geoloc
+uses_hashtag
+number_of_friends
+no_bio_no_location_friends_100
+uses_foursquare

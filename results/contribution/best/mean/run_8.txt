@@ -1,0 +1,18 @@
+Accuracy: 0.99102564
+Precision: 0.99279967
+Recall: 0.98923077
+F-M: 0.99091549
+MCC: 0.98223596
+AUC: 0.99950427
+
+bidirectional_link_ratio
+ratio_friends_followers_square
+number_of_tweets
+urls_ratio
+at_least_1_retweets
+user_id_in_tweets
+following_rate
+uses_api
+has_been_listed
+uses_twitter
+age

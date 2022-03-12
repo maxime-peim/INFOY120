@@ -1,0 +1,22 @@
+Accuracy: 0.99282051
+Precision: 0.99331800
+Recall: 0.99230769
+F-M: 0.99275996
+MCC: 0.98574091
+AUC: 0.99930440
+
+bidirectional link ratio
+ratio friends followers square
+number of tweets
+api urls ratio
+has at least 30 followers
+is favourite
+average neighbor followers
+following to median followers
+user id tweets
+average neighbors tweets
+uses api
+following rate
+uses twitter
+has enabled geoloc
+number of friends

@@ -1,0 +1,24 @@
+Accuracy: 0.99179487
+Precision: 0.99132456
+Recall: 0.99230769
+F-M: 0.99174751
+MCC: 0.98372133
+AUC: 0.99983432
+
+bidirectional link ratio
+ratio friends followers square
+api urls ratio
+number of tweets
+api ratio
+has at least 30 followers
+user id in tweets
+average neighbor followers
+spam tweets
+average neighbors tweets
+following rate
+uses api
+number of friends
+has biography
+has ratio friends followers 50
+has url
+uses punctuation

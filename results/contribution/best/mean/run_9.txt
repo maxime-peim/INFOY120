@@ -1,0 +1,19 @@
+Accuracy: 0.99153846
+Precision: 0.99330129
+Recall: 0.98974359
+F-M: 0.99144774
+MCC: 0.98321794
+AUC: 0.99917423
+
+bidirectional_link_ratio
+ratio_friends_followers_square
+number_of_tweets
+api_ratio
+has_at_least_30_followers
+average_neighbor_followers
+average_neighbors_tweets
+following_rate
+has_been_listed
+same_tweets
+retweet_90
+tweets_similarity

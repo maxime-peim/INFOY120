@@ -1,0 +1,22 @@
+Accuracy: 0.99230769
+Precision: 0.99384848
+Recall: 0.99076923
+F-M: 0.99218090
+MCC: 0.98484848
+AUC: 0.99972387
+
+bidirectional link ratio
+ratio friends followers square
+number of tweets
+api urls ratio
+average neighbor followers
+user id tweets
+spam tweets
+following rate
+uses twitter
+has enabled geoloc
+has 2followers friends
+uses hashtag
+has address
+has 0 tweet
+tweets similarity

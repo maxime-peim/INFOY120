@@ -1,0 +1,22 @@
+Accuracy: 0.99333333
+Precision: 0.99337889
+Recall: 0.99333333
+F-M: 0.99328599
+MCC: 0.98680097
+AUC: 0.99970414
+
+api urls ratio
+average neighbor followers
+bidirectional link ratio
+following rate
+following to median followers
+has been listed
+has ratio friends followers 50
+no bio no location friends 100
+number of friends
+number of tweets
+ratio friends followers square
+user id in tweets
+user id tweets
+uses api
+uses hashtag 

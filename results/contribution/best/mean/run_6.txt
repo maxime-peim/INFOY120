@@ -1,0 +1,19 @@
+Accuracy: 0.99128205
+Precision: 0.99183910
+Recall: 0.99076923
+F-M: 0.99121928
+MCC: 0.98272372
+AUC: 0.99928994
+
+bidirectional link ratio
+ratio friends followers square
+api urls ratio
+is favourite
+has at least 30 followers
+has at least 50 tweets
+at least 1 retweets
+average neighbor followers
+spam tweets
+following rate
+uses twitter
+tweets similarity

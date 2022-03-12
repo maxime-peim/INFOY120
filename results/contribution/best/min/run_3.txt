@@ -1,0 +1,24 @@
+Accuracy: 0.99307692
+Precision: 0.99388722
+Recall: 0.99230769
+F-M: 0.99302752
+MCC: 0.98628655
+AUC: 0.99958974
+
+bidirectional link ratio
+ratio friends followers square
+api urls ratio
+api ratio
+has at least 30 followers
+urls ratio
+average neighbor followers
+following to median followers
+average neighbors tweets
+uses api
+has been listed
+number of friends
+has url
+uses hashtag
+uses iphone
+has 0 tweet
+has image

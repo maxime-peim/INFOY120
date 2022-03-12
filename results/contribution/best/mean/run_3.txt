@@ -1,0 +1,22 @@
+Accuracy: 0.99256410
+Precision: 0.99386864
+Recall: 0.99128205
+F-M: 0.99249336
+MCC: 0.98528341
+AUC: 0.99975411
+
+api ratio
+api urls ratio
+at least 1 retweets
+average neighbor followers
+average neighbors tweets
+bidirectional link ratio
+following rate
+following to median followers
+has at least 30 followers
+has been listed
+number of friends
+number of tweets
+ratio friends followers square
+same tweets 3
+uses api 
