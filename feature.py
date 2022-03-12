@@ -355,7 +355,7 @@ user_id_in_tweets = Feature(
     tweets="tweets/text",
 )
 urls_in_tweets = Feature(
-    "user_id_tweets",
+    "urls_in_tweets",
     lambda tweets: False
     if tweets is np.nan
     else any("http" in tweet for tweet in tweets),
@@ -382,18 +382,17 @@ same_tweets_3 = Feature(
 )
 
 
-def spam_tweets_func(dataframe):
-    tweets_df = dataframe.explode("tweets_text")["tweets_text"]
-    return (
-        tweets_df.transform(lambda x: 0 if x is np.nan else len(x))
-        .groupby("user_id")
-        .agg(max)
-    )
+def spam_tweets_func(tweets):
+    if tweets is np.nan:
+        return False
+
+    return sum(
+        any(word in tweet.lower() for word in ["diet", "make money", "work from home"])
+        for tweet in tweets
+    ) >= 0.3 * len(tweets)
 
 
-spam_tweets = Feature(
-    "spam_tweets", spam_tweets_func, complex=True, tweets="tweets/text"
-)
+spam_tweets = Feature("spam_tweets", spam_tweets_func, tweets="tweets/text")
 retweet_90 = Feature(
     "retweet_90",
     lambda tweets: 0
