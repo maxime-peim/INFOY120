@@ -557,7 +557,7 @@ def average_neighbors_followers_func(dataframe):
 
 
 average_neighbors_followers = Feature(
-    "average_neighbor_followers",
+    "average_neighbors_followers",
     average_neighbors_followers_func,
     complex=True,
     friends="friends/friends_id",
