@@ -23,13 +23,23 @@ SCORING = {
 }
 
 
-def build_paper_datasets():
+def dataset_path(path, label, dataset_name):
+    return os.path.join(path, label, dataset_name)
+
+
+def build_paper_datasets(path):
     # building human dataset
-    HUM = Dataset("datasets/human/E13", "datasets/human/TFP")
+    HUM = Dataset(
+        dataset_path(path, "human", "E13"), dataset_path(path, "human", "TFP")
+    )
     HUM.name = "HUM"
 
     # building fake dataset
-    FAK = Dataset("datasets/fake/FSF", "datasets/fake/INT", "datasets/fake/TWT")
+    FAK = Dataset(
+        dataset_path(path, "fake", "FSF"),
+        dataset_path(path, "fake", "INT"),
+        dataset_path(path, "fake", "TWT"),
+    )
     FAK.name = "FAK"
     FAK.undersample(HUM.size)
 

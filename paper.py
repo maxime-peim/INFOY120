@@ -1,16 +1,22 @@
+import argparse
 import logging
 import sys
 
-import utils
 import feature as ft
+import utils
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Process some integers.")
+    parser.add_argument("path", type=str, help="Path to datasets")
+
+    args = parser.parse_args()
+
     logging.basicConfig(stream=sys.stdout)
 
-    HUM, FAK, BAS = utils.build_paper_datasets()
+    HUM, FAK, BAS = utils.build_paper_datasets(args.path)
     features_evaluation, labels = BAS.evaluate_features(ft.all_features)
 
     evaluations = [
