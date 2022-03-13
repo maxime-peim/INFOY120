@@ -59,6 +59,7 @@ def extract_scores(scores):
 
 
 def save_scores(scores, path):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as score_out:
         for score_name, score_value in scores.items():
             score_out.write(f"{score_name}: {score_value:.8f}\n")

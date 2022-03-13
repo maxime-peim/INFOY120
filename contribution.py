@@ -16,13 +16,38 @@ SCORES_FILE_TEMPLATE = os.path.join(SCORES_FOLDER_TEMPLATE, "{features_names}.tx
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some integers.")
-    parser.add_argument("path", type="str", help="Path to datasets")
+    parser.add_argument("path", type=str, help="Path to datasets.")
     parser.add_argument("-v", dest="verbose", action="store_true", help="Verbose")
-    parser.add_argument("-c", "--custom", nargs="+", type=str, default=None)
-    parser.add_argument("-n", "--name", type=str, default="Custom group")
-    parser.add_argument("-s", "--single-eval", action="store_true")
-    parser.add_argument("-b", "--best", action="store_true")
-    parser.add_argument("-m", "--min", action="store_true")
+    parser.add_argument(
+        "-c",
+        "--custom",
+        nargs="+",
+        type=str,
+        default=None,
+        help="List of features names to build a RF.",
+    )
+    parser.add_argument(
+        "-n",
+        "--name",
+        type=str,
+        default="Custom group",
+        help="Name for a custom feature set, given by --custom",
+    )
+    parser.add_argument(
+        "-s",
+        "--single-eval",
+        action="store_true",
+        help="Evaluate each feature individually and store the results.",
+    )
+    parser.add_argument(
+        "-b", "--best", action="store_true", help="Find the best feature set."
+    )
+    parser.add_argument(
+        "-m",
+        "--min",
+        action="store_true",
+        help="Use min function instead of mean for finding the best feature set.",
+    )
 
     args = parser.parse_args()
 
