@@ -1,5 +1,6 @@
 import os
 
+import pandas as pd
 from numpy import mean
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
@@ -13,6 +14,8 @@ from sklearn.model_selection import cross_validate
 
 from dataset import Dataset
 
+Scores = dict[str, float]
+
 SCORING = {
     "Accuracy": "accuracy",
     "Precision": make_scorer(precision_score, pos_label="human"),
@@ -23,11 +26,11 @@ SCORING = {
 }
 
 
-def dataset_path(path, label, dataset_name):
+def dataset_path(path: str, label: str, dataset_name: str) -> str:
     return os.path.join(path, label, dataset_name)
 
 
-def build_paper_datasets(path):
+def build_paper_datasets(path: str) -> tuple[Dataset, Dataset, Dataset]:
     # building human dataset
     HUM = Dataset(
         dataset_path(path, "human", "E13"), dataset_path(path, "human", "TFP")
@@ -50,7 +53,7 @@ def build_paper_datasets(path):
     return HUM, FAK, BAS
 
 
-def extract_scores(scores):
+def extract_scores(scores: Scores) -> Scores:
     extracted = {}
     for score_name, values in scores.items():
         if score_name.startswith("test_"):
@@ -58,14 +61,14 @@ def extract_scores(scores):
     return extracted
 
 
-def save_scores(scores, path):
+def save_scores(scores: Scores, path: str):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as score_out:
         for score_name, score_value in scores.items():
             score_out.write(f"{score_name}: {score_value:.8f}\n")
 
 
-def get_scores(features_evaluation, labels):
+def get_scores(features_evaluation: pd.DataFrame, labels: pd.DataFrame) -> Scores:
     # https://machinelearningmastery.com/random-forest-ensemble-in-python/
     RF_model = RandomForestClassifier()
     full_scores = cross_validate(
@@ -81,12 +84,14 @@ def get_scores(features_evaluation, labels):
     return extract_scores(full_scores)
 
 
-def classify_and_save(features_evaluation, labels, path):
+def classify_and_save(
+    features_evaluation: pd.DataFrame, labels: pd.DataFrame, path: str
+):
     scores = get_scores(features_evaluation, labels)
     save_scores(scores, path)
 
 
-def get_result_from_file(path):
+def get_result_from_file(path: str) -> Scores:
     if not os.path.exists(path):
         raise FileExistsError
 
@@ -100,5 +105,6 @@ def get_result_from_file(path):
     return scores
 
 
-def normfile(filename):
+def normfile(filename: str) -> str:
     return filename.lower().replace(" ", "_")
+

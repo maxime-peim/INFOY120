@@ -280,6 +280,7 @@ class Dataset:
             logger.debug(
                 f"{i+1}/{len(features)} Extracting '{feature.name}' needed columns ..."
             )
+            # extract first the column needed in each datafiles
             for datafiles in self._datafiles.values():
                 extracted_columns = datafiles.extract(feature)
                 extracted.append(extracted_columns)

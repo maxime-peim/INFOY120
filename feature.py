@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import re
 import string
@@ -5,6 +7,7 @@ from collections import namedtuple
 from collections.abc import Hashable, MutableSet
 from datetime import datetime
 from functools import partial
+from typing import Any, Callable, Iterable, Iterator
 
 import numpy as np
 import pandas as pd
@@ -13,26 +16,28 @@ ColumnToArg = namedtuple("ColumnToArg", ["column_name", "argument_name"])
 
 
 class NamedSet(Hashable, MutableSet):
+    """Set object with a name."""
+
     __hash__ = MutableSet._hash
 
-    def __init__(self, name="Generic group", iterable=()):
+    def __init__(self, name: str = "Generic group", iterable: Iterable = ()):
         self._name = name
         self.data = set(iterable)
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
 
-    def __contains__(self, value):
+    def __contains__(self, value: Any) -> bool:
         return value in self.data
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator:
         return iter(self.data)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.data)
 
-    def __or__(self, other):
+    def __or__(self, other: Any) -> bool:
         if not isinstance(other, (set, NamedSet, type(self))):
             raise NotImplementedError
 
@@ -40,41 +45,74 @@ class NamedSet(Hashable, MutableSet):
             name=f"{self.name} U {other.name}", iterable=self.data.union(other)
         )
 
-    def add(self, element):
+    def add(self, element: Any):
         self.data.add(element)
 
-    def discard(self, element):
+    def discard(self, element: Any) -> Any:
         return self.data.discard(element)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.name} = {{{', '.join(str(d) for d in self.data)}}}"
 
 
 class FeaturesGroup(NamedSet):
+    """Named set for features."""
+
     @property
-    def names(self):
+    def names(self) -> list[str]:
         return [feature.name for feature in self]
 
 
 class Feature:
-    registered = {}
+    registered: dict[str, Feature] = {}
 
-    def __init__(self, name, evaluate, *, complex=False, **columns):
+    def __init__(
+        self,
+        name: str,
+        evaluate: Callable,
+        *,
+        complex: bool = False,
+        **columns: dict[str, str],
+    ):
+        """_summary_
+
+        Args:
+            name (str): the name of the feature
+            evaluate (Callable): function that transforms, for each user, some data to the feature evaluation.
+            complex (bool, optional): if the feature is complex, instead of passing the needed values, pass the whole columns as a dataframe. Defaults to False.
+            columns (dict[str, str]): map between arguments names of the evaluation function and the columns of the datafiles.
+        """
         self.name = name
         self._to_extract = self._build_extraction_dict(columns)
         self._evaluate = self._evaluate_proxy(evaluate, complex)
         self.registered[self.name] = self
 
     @property
-    def evaluate(self):
+    def evaluate(self) -> Callable:
         return self._evaluate
 
-    def needed_columns(self, datafile_prefix):
+    def needed_columns(self, datafile_prefix: str) -> list[str]:
+        """Returns the needed columns names for the evaluation of the feature.
+
+        Args:
+            datafile_prefix (str): prefix of a datafile class.
+
+        Returns:
+            list[str]: list of columns names
+        """
         columns_to_args = self._to_extract.get(datafile_prefix, [])
         return [column_to_arg.column_name for column_to_arg in columns_to_args]
 
-    def _evaluate_proxy(self, evaluate, complex):
+    def _evaluate_proxy(self, evaluate: Callable, complex: bool) -> Callable:
+        """Returns a callable depending on which the feature is complex or not.
 
+        Args:
+            evaluate (Callable): the initial callable for evaluation given at initialization.
+            complex (bool): _description_
+
+        Returns:
+            Callable: _description_
+        """
         arg_column_mapping = {
             column_to_arg.argument_name: f"{class_prefix}_{column_to_arg.column_name}"
             for class_prefix, columns_to_args in self._to_extract.items()
@@ -97,7 +135,7 @@ class Feature:
         return evaluate_wrapper
 
     @staticmethod
-    def _build_extraction_dict(columns):
+    def _build_extraction_dict(columns: dict[str, str]) -> dict[str, list[ColumnToArg]]:
         result = {}
         for arg_name, column in columns.items():
             class_prefix, column_name = column.split("/")
@@ -110,16 +148,16 @@ class Feature:
     def __hash__(self):
         return hash(self.name)
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if not isinstance(other, type(self)):
             raise NotImplementedError
 
         return self.name == other.name
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Feature('{self.name}')"
 
 
